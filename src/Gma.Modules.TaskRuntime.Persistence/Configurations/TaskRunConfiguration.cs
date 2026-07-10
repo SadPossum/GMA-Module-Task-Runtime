@@ -19,7 +19,7 @@ internal sealed class TaskRunConfiguration : IEntityTypeConfiguration<TaskRun>
         builder.Property(taskRun => taskRun.Status).HasConversion<int>().IsRequired();
         builder.Property(taskRun => taskRun.Payload).HasMaxLength(TaskRunRequest.PayloadMaxLength).IsRequired();
         builder.Property(taskRun => taskRun.DeduplicationKey).HasMaxLength(TaskRun.DeduplicationKeyMaxLength);
-        builder.Property(taskRun => taskRun.TenantId).HasMaxLength(TenantIds.MaxLength);
+        builder.Property(taskRun => taskRun.ScopeId).HasMaxLength(ScopeIds.MaxLength);
         builder.Property(taskRun => taskRun.RequestedBy).HasMaxLength(TaskNames.ActorMaxLength);
         builder.Property(taskRun => taskRun.LockedBy).HasMaxLength(TaskRun.WorkerIdMaxLength);
         builder.Property(taskRun => taskRun.NodeId).HasMaxLength(TaskRun.WorkerIdMaxLength);
@@ -39,7 +39,7 @@ internal sealed class TaskRunConfiguration : IEntityTypeConfiguration<TaskRun>
         {
             taskRun.ModuleName,
             taskRun.TaskName,
-            taskRun.TenantId,
+            taskRun.ScopeId,
             taskRun.DeduplicationKey,
             taskRun.Status
         });

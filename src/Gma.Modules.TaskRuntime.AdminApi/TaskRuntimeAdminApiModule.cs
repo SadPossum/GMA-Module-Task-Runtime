@@ -126,7 +126,7 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
                         request.PayloadJson,
                         request.ScheduledAtUtc,
                         request.WorkerGroup ?? TaskWorkerGroups.Default,
-                        request.TenantId,
+                        request.ScopeId,
                         request.CorrelationId,
                         ResolveActorId(httpContext),
                         request.MaxAttempts ?? 1,
@@ -134,7 +134,7 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
                         request.DeduplicationKey),
                     token),
                 cancellationToken,
-                tenantId: request.TenantId,
+                tenantId: request.ScopeId,
                 errorStatusCodes: AdminErrorStatusCodes).ConfigureAwait(false));
 
         runs.MapPost("/{runId:guid}/control", async (
@@ -203,7 +203,7 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
         string PayloadJson,
         DateTimeOffset? ScheduledAtUtc,
         string? WorkerGroup,
-        string? TenantId,
+        string? ScopeId,
         Guid? CorrelationId,
         int? MaxAttempts,
         int? PayloadVersion,

@@ -17,7 +17,7 @@ internal sealed class GetTaskRunStatsQueryHandler(ITaskRunStore store)
                     query.ModuleName,
                     query.TaskName,
                     query.WorkerGroup,
-                    query.TenantId),
+                    query.ScopeId),
                 cancellationToken)
             .ConfigureAwait(false);
 

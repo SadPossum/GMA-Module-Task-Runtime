@@ -70,12 +70,12 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
         command.SetAction((parseResult, cancellationToken) =>
         {
             AdminCliExecutor executor = services.GetRequiredService<AdminCliExecutor>();
-            string? tenantId = parseResult.GetValue(globalOptions.TenantOption);
+            string? scopeId = parseResult.GetValue(globalOptions.TenantOption);
 
             return executor.ExecuteAsync(
                 parseResult,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsList, TaskRuntimeAdminPermissions.RunsRead),
-                tenantId,
+                scopeId,
                 requireTenant: false,
                 async (provider, token) =>
                 {
@@ -91,7 +91,7 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                             parseResult.GetValue(taskOption),
                             parseResult.GetValue(workerGroupOption),
                             status,
-                            tenantId,
+                            scopeId,
                             parseResult.GetValue(pageOption),
                             parseResult.GetValue(pageSizeOption)),
                         token).ConfigureAwait(false);
@@ -123,12 +123,12 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
         command.SetAction((parseResult, cancellationToken) =>
         {
             AdminCliExecutor executor = services.GetRequiredService<AdminCliExecutor>();
-            string? tenantId = parseResult.GetValue(globalOptions.TenantOption);
+            string? scopeId = parseResult.GetValue(globalOptions.TenantOption);
 
             return executor.ExecuteAsync(
                 parseResult,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsStats, TaskRuntimeAdminPermissions.RunsRead),
-                tenantId,
+                scopeId,
                 requireTenant: false,
                 async (provider, token) =>
                 {
@@ -138,7 +138,7 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                             parseResult.GetValue(moduleOption),
                             parseResult.GetValue(taskOption),
                             parseResult.GetValue(workerGroupOption),
-                            tenantId),
+                            scopeId),
                         token).ConfigureAwait(false);
 
                     if (result.IsSuccess)
@@ -164,12 +164,12 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
         command.SetAction((parseResult, cancellationToken) =>
         {
             AdminCliExecutor executor = services.GetRequiredService<AdminCliExecutor>();
-            string? tenantId = parseResult.GetValue(globalOptions.TenantOption);
+            string? scopeId = parseResult.GetValue(globalOptions.TenantOption);
 
             return executor.ExecuteAsync(
                 parseResult,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsGet, TaskRuntimeAdminPermissions.RunsRead),
-                tenantId,
+                scopeId,
                 requireTenant: false,
                 async (provider, token) =>
                 {
@@ -211,12 +211,12 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             AdminCliExecutor executor = services.GetRequiredService<AdminCliExecutor>();
-            string? tenantId = parseResult.GetValue(globalOptions.TenantOption);
+            string? scopeId = parseResult.GetValue(globalOptions.TenantOption);
 
             return await executor.ExecuteAsync(
                 parseResult,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsControl, TaskRuntimeAdminPermissions.RunsControl),
-                tenantId,
+                scopeId,
                 requireTenant: false,
                 async (provider, token) =>
                 {
@@ -293,12 +293,12 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             AdminCliExecutor executor = services.GetRequiredService<AdminCliExecutor>();
-            string? tenantId = parseResult.GetValue(globalOptions.TenantOption);
+            string? scopeId = parseResult.GetValue(globalOptions.TenantOption);
 
             return await executor.ExecuteAsync(
                 parseResult,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsEnqueue, TaskRuntimeAdminPermissions.RunsCreate),
-                tenantId,
+                scopeId,
                 requireTenant: false,
                 async (provider, token) =>
                 {
@@ -323,7 +323,7 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                             payload.Value,
                             parseResult.GetValue(scheduledAtOption),
                             parseResult.GetValue(workerGroupOption) ?? TaskWorkerGroups.Default,
-                            tenantId,
+                            scopeId,
                             parseResult.GetValue(correlationIdOption),
                             actorContext.Actor?.Id,
                             parseResult.GetValue(maxAttemptsOption),
@@ -356,12 +356,12 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
         command.SetAction((parseResult, cancellationToken) =>
         {
             AdminCliExecutor executor = services.GetRequiredService<AdminCliExecutor>();
-            string? tenantId = parseResult.GetValue(globalOptions.TenantOption);
+            string? scopeId = parseResult.GetValue(globalOptions.TenantOption);
 
             return executor.ExecuteAsync(
                 parseResult,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsCancel, TaskRuntimeAdminPermissions.RunsCancel),
-                tenantId,
+                scopeId,
                 requireTenant: false,
                 async (provider, token) =>
                 {
@@ -403,12 +403,12 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
         command.SetAction((parseResult, cancellationToken) =>
         {
             AdminCliExecutor executor = services.GetRequiredService<AdminCliExecutor>();
-            string? tenantId = parseResult.GetValue(globalOptions.TenantOption);
+            string? scopeId = parseResult.GetValue(globalOptions.TenantOption);
 
             return executor.ExecuteAsync(
                 parseResult,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsRetry, TaskRuntimeAdminPermissions.RunsRetry),
-                tenantId,
+                scopeId,
                 requireTenant: false,
                 async (provider, token) =>
                 {
@@ -451,7 +451,7 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                 ("Version", run => run.PayloadVersion.ToString(CultureInfo.InvariantCulture)),
                 ("Status", run => TaskRunStatusNames.ToWireName(run.Status)),
                 ("Attempts", run => $"{run.Attempts.ToString(CultureInfo.InvariantCulture)}/{run.MaxAttempts.ToString(CultureInfo.InvariantCulture)}"),
-                ("Tenant", run => run.TenantId ?? string.Empty),
+                ("Tenant", run => run.ScopeId ?? string.Empty),
                 ("CreatedAtUtc", run => run.CreatedAtUtc.ToString("O", CultureInfo.InvariantCulture))
             ]);
 

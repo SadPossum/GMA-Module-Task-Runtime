@@ -47,7 +47,7 @@ namespace Gma.Modules.TaskRuntime.Persistence.PostgreSqlMigrations.Migrations
                     WorkerGroup = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     Status = table.Column<int>(type: "integer", nullable: false),
                     Payload = table.Column<string>(type: "character varying(262144)", maxLength: 262144, nullable: false),
-                    TenantId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    ScopeId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
                     CorrelationId = table.Column<Guid>(type: "uuid", nullable: true),
                     CreatedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     ScheduledAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),

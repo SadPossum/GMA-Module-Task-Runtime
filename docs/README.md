@@ -50,7 +50,7 @@ If task handlers dispatch commands, also compose the CQRS bridge:
 builder.AddTaskCqrs();
 ```
 
-For tenant-scoped task payloads, compose the tenancy task bridge:
+For scope-aware task payloads, compose the tenancy task bridge:
 
 ```csharp
 builder.AddTenantTaskExecutionContext();
@@ -95,7 +95,7 @@ The module declares:
 | `tasks.runs.retry` | Retry terminal task runs. |
 | `tasks.runs.control` | Send control messages to running task handlers. |
 
-Task runtime permissions are global operator permissions and are not tenant-scoped by default.
+Task runtime permissions are global operator permissions and are not scope-aware by default.
 
 ## Persistence
 

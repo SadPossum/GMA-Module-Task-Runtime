@@ -39,7 +39,7 @@ internal sealed class EnqueueTaskRunCommandHandler(
             nowUtc,
             scheduledAtUtc,
             command.WorkerGroup,
-            command.TenantId,
+            command.ScopeId,
             command.CorrelationId,
             command.RequestedBy,
             command.MaxAttempts,

@@ -158,7 +158,7 @@ namespace Gma.Modules.TaskRuntime.Persistence.SqlServerMigrations.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
-                    b.Property<string>("TenantId")
+                    b.Property<string>("ScopeId")
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 

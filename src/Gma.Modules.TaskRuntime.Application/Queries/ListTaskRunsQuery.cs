@@ -8,6 +8,6 @@ public sealed record ListTaskRunsQuery(
     string? TaskName,
     string? WorkerGroup,
     TaskRunStatus? Status,
-    string? TenantId,
+    string? ScopeId,
     int Page,
     int PageSize) : IQuery<IReadOnlyList<TaskRunSummary>>;

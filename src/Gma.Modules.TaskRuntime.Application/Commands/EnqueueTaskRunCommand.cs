@@ -10,7 +10,7 @@ public sealed record EnqueueTaskRunCommand(
     string PayloadJson,
     DateTimeOffset? ScheduledAtUtc,
     string WorkerGroup,
-    string? TenantId,
+    string? ScopeId,
     Guid? CorrelationId,
     string? RequestedBy,
     int MaxAttempts,

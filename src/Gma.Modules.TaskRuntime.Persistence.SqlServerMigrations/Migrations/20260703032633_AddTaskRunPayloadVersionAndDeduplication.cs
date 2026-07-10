@@ -27,17 +27,17 @@ namespace Gma.Modules.TaskRuntime.Persistence.SqlServerMigrations.Migrations
                 defaultValue: 1);
 
             migrationBuilder.CreateIndex(
-                name: "IX_task_runs_ModuleName_TaskName_TenantId_DeduplicationKey_Status",
+                name: "IX_task_runs_ModuleName_TaskName_ScopeId_DeduplicationKey_Status",
                 schema: "tasks",
                 table: "task_runs",
-                columns: new[] { "ModuleName", "TaskName", "TenantId", "DeduplicationKey", "Status" });
+                columns: new[] { "ModuleName", "TaskName", "ScopeId", "DeduplicationKey", "Status" });
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
-                name: "IX_task_runs_ModuleName_TaskName_TenantId_DeduplicationKey_Status",
+                name: "IX_task_runs_ModuleName_TaskName_ScopeId_DeduplicationKey_Status",
                 schema: "tasks",
                 table: "task_runs");
 

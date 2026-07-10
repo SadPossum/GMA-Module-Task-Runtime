@@ -17,7 +17,7 @@ internal sealed class ListTaskRunsQueryHandler(ITaskRunStore store)
             query.TaskName,
             query.WorkerGroup,
             query.Status,
-            query.TenantId,
+            query.ScopeId,
             query.Page,
             query.PageSize);
 
