@@ -118,6 +118,28 @@ Tables:
 
 Provider-specific migrations exist for SQL Server and PostgreSQL. Tests and deployment automation apply migrations explicitly; default hosts do not auto-migrate.
 
+Terminal history cleanup is optional and disabled by default:
+
+```json
+{
+  "TaskRuntimeRetention": {
+    "Enabled": false,
+    "SucceededRunRetention": "30.00:00:00",
+    "FailedRunRetention": "90.00:00:00",
+    "CanceledRunRetention": "30.00:00:00",
+    "TimedOutRunRetention": "90.00:00:00",
+    "HandledControlRetention": "30.00:00:00",
+    "FailedControlRetention": "90.00:00:00",
+    "ExpiredControlRetention": "30.00:00:00",
+    "CleanupInterval": "01:00:00",
+    "BatchSize": 500,
+    "MaxBatchesPerStatusPerCycle": 10
+  }
+}
+```
+
+Only terminal runs and terminal control messages are eligible. Each status has an independent retention window, cleanup work is bounded per status and cycle, and a run is retained while any control-message history still references it.
+
 ## Boundaries
 
 - Task payload contracts belong to the module that owns the task.

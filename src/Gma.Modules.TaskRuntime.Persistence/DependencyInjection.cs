@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Gma.Framework.Tasks;
 using Gma.Framework.Cqrs.UnitOfWork;
 using Gma.Framework.ModuleComposition;
@@ -23,6 +24,16 @@ public static class DependencyInjection
                 TaskRuntimeMigrations.PostgreSqlAssembly,
                 TaskRuntimeMigrations.Schema,
                 TaskRuntimeMigrations.HistoryTable));
+        builder.Services
+            .AddOptions<TaskRuntimeRetentionOptions>()
+            .Bind(builder.Configuration.GetSection(TaskRuntimeRetentionOptions.SectionName))
+            .ValidateOnStart();
+        builder.Services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IValidateOptions<TaskRuntimeRetentionOptions>,
+                TaskRuntimeRetentionOptionsValidator>());
+        builder.Services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, TaskRuntimeRetentionService>());
 
         builder.Services.TryAddScoped<ITaskRunStore, TaskRuntimeRunStore>();
         builder.Services.TryAddScoped<ITaskRuntimeReporter>(provider => provider.GetRequiredService<ITaskRunStore>());

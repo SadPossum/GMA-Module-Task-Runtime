@@ -35,6 +35,7 @@ internal sealed class TaskRunConfiguration : IEntityTypeConfiguration<TaskRun>
             taskRun.LockedUntilUtc
         });
         builder.HasIndex(taskRun => new { taskRun.ModuleName, taskRun.TaskName });
+        builder.HasIndex(taskRun => new { taskRun.Status, taskRun.CompletedAtUtc });
         builder.HasIndex(taskRun => new
         {
             taskRun.ModuleName,

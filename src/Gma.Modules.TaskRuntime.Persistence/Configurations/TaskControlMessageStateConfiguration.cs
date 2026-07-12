@@ -17,5 +17,6 @@ internal sealed class TaskControlMessageStateConfiguration : IEntityTypeConfigur
         builder.Property(message => message.Status).HasConversion<int>().IsRequired();
         builder.Property(message => message.LastError).HasMaxLength(TaskRun.ErrorMaxLength);
         builder.HasIndex(message => new { message.RunId, message.Status, message.EnqueuedAtUtc });
+        builder.HasIndex(message => new { message.Status, message.CompletedAtUtc });
     }
 }
