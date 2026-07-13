@@ -1,5 +1,6 @@
 namespace Gma.Modules.TaskRuntime.Persistence;
 
+using Gma.Framework.Runtime.Maintenance;
 using Gma.Framework.Runtime.Time;
 using Gma.Framework.Tasks;
 using Gma.Framework.Tasks.Infrastructure;
@@ -101,13 +102,13 @@ internal sealed class TaskRuntimeRetentionService(
             "control message",
             status.ToString(),
             currentOptions,
-            token => dbContext.TaskControlMessages
+            (batchSize, token) => dbContext.TaskControlMessages
                 .Where(message =>
                     message.Status == status &&
                     message.CompletedAtUtc != null &&
                     message.CompletedAtUtc < cutoff)
                 .OrderBy(message => message.CompletedAtUtc)
-                .Take(currentOptions.BatchSize)
+                .Take(batchSize)
                 .ExecuteDeleteAsync(token),
             cancellationToken).ConfigureAwait(false);
 
@@ -121,14 +122,14 @@ internal sealed class TaskRuntimeRetentionService(
             "run",
             status.ToString(),
             currentOptions,
-            token => dbContext.TaskRuns
+            (batchSize, token) => dbContext.TaskRuns
                 .Where(run =>
                     run.Status == status &&
                     run.CompletedAtUtc != null &&
                     run.CompletedAtUtc < cutoff &&
                     !dbContext.TaskControlMessages.Any(message => message.RunId == run.Id))
                 .OrderBy(run => run.CompletedAtUtc)
-                .Take(currentOptions.BatchSize)
+                .Take(batchSize)
                 .ExecuteDeleteAsync(token),
             cancellationToken).ConfigureAwait(false);
 
@@ -136,27 +137,18 @@ internal sealed class TaskRuntimeRetentionService(
         string recordKind,
         string status,
         TaskRuntimeRetentionOptions currentOptions,
-        Func<CancellationToken, Task<int>> deleteBatch,
+        Func<int, CancellationToken, Task<int>> deleteBatch,
         CancellationToken cancellationToken)
     {
         int deletedTotal = 0;
         try
         {
-            for (int batch = 0; batch < currentOptions.MaxBatchesPerStatusPerCycle; batch++)
-            {
-                int deleted = await deleteBatch(cancellationToken).ConfigureAwait(false);
-                if (deleted < 0 || deleted > currentOptions.BatchSize)
-                {
-                    throw new InvalidOperationException(
-                        $"Task runtime retention returned invalid batch count {deleted}.");
-                }
-
-                deletedTotal += deleted;
-                if (deleted < currentOptions.BatchSize)
-                {
-                    break;
-                }
-            }
+            deletedTotal = await BoundedBatchProcessor.ExecuteAsync(
+                    currentOptions.BatchSize,
+                    currentOptions.MaxBatchesPerStatusPerCycle,
+                    deleteBatch,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
             if (deletedTotal > 0)
             {
