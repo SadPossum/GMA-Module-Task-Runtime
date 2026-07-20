@@ -20,14 +20,21 @@ internal sealed class TaskRuntimeRetentionService(
         TaskRuntimeRetentionOptions currentOptions = options.Value;
         if (!currentOptions.Enabled)
         {
-            logger.LogInformation("Task runtime retention cleanup is disabled.");
-            return;
+            logger.LogInformation(
+                "Task runtime retention cleanup is disabled; durable control-message expiry remains active.");
         }
 
         using PeriodicTimer timer = new(currentOptions.CleanupInterval);
         while (!stoppingToken.IsCancellationRequested)
         {
-            await this.CleanupOnceAsync(currentOptions, stoppingToken).ConfigureAwait(false);
+            if (currentOptions.Enabled)
+            {
+                await this.CleanupOnceAsync(currentOptions, stoppingToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await this.ExpireControlMessagesOnceAsync(currentOptions, stoppingToken).ConfigureAwait(false);
+            }
             try
             {
                 await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false);
@@ -46,6 +53,12 @@ internal sealed class TaskRuntimeRetentionService(
         using IServiceScope scope = scopeFactory.CreateScope();
         TaskRuntimeDbContext dbContext = scope.ServiceProvider.GetRequiredService<TaskRuntimeDbContext>();
         DateTimeOffset nowUtc = scope.ServiceProvider.GetRequiredService<ISystemClock>().UtcNow;
+
+        await this.ExpireControlMessagesAsync(
+            dbContext,
+            nowUtc,
+            currentOptions,
+            cancellationToken).ConfigureAwait(false);
 
         await this.CleanupControlStatusAsync(
             dbContext,
@@ -90,6 +103,67 @@ internal sealed class TaskRuntimeRetentionService(
             nowUtc.Subtract(currentOptions.TimedOutRunRetention),
             currentOptions,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ExpireControlMessagesOnceAsync(
+        TaskRuntimeRetentionOptions currentOptions,
+        CancellationToken cancellationToken)
+    {
+        using IServiceScope scope = scopeFactory.CreateScope();
+        TaskRuntimeDbContext dbContext = scope.ServiceProvider.GetRequiredService<TaskRuntimeDbContext>();
+        DateTimeOffset nowUtc = scope.ServiceProvider.GetRequiredService<ISystemClock>().UtcNow;
+        await this.ExpireControlMessagesAsync(
+            dbContext,
+            nowUtc,
+            currentOptions,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ExpireControlMessagesAsync(
+        TaskRuntimeDbContext dbContext,
+        DateTimeOffset nowUtc,
+        TaskRuntimeRetentionOptions currentOptions,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            int expired = await BoundedBatchProcessor.ExecuteAsync(
+                    currentOptions.BatchSize,
+                    currentOptions.MaxBatchesPerStatusPerCycle,
+                    (batchSize, token) => dbContext.TaskControlMessages
+                        .Where(message =>
+                            (message.Status == TaskControlMessageStatus.Pending ||
+                             message.Status == TaskControlMessageStatus.Delivered ||
+                             message.Status == TaskControlMessageStatus.Failed) &&
+                            message.ExpiresAtUtc != null &&
+                            message.ExpiresAtUtc <= nowUtc)
+                        .OrderBy(message => message.ExpiresAtUtc)
+                        .ThenBy(message => message.Id)
+                        .Take(batchSize)
+                        .ExecuteUpdateAsync(
+                            setters => setters
+                                .SetProperty(message => message.Status, TaskControlMessageStatus.Expired)
+                                .SetProperty(message => message.CompletedAtUtc, message => message.ExpiresAtUtc)
+                                .SetProperty(
+                                    message => message.ConcurrencyVersion,
+                                    message => message.ConcurrencyVersion + 1),
+                            token),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (expired > 0)
+            {
+                logger.LogInformation("Expired {ExpiredCount} task control messages.", expired);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Failed to expire task control messages; the next lifecycle cycle will retry.");
+        }
     }
 
     private async Task CleanupControlStatusAsync(

@@ -1,5 +1,7 @@
 # TaskRuntime Module
 
+Current engineering work is tracked in [TaskRuntime Production Hardening Task](task-runtime-production-hardening-task.md).
+
 The `TaskRuntime` module is an optional persisted runtime for queued tasks, long-running task handlers, progress reporting, retries, cancellation, and operator control. It is reusable infrastructure, not an example module and not a scheduler framework by itself.
 
 ## Projects
@@ -118,7 +120,7 @@ Tables:
 
 Provider-specific migrations exist for SQL Server and PostgreSQL. Tests and deployment automation apply migrations explicitly; default hosts do not auto-migrate.
 
-Terminal history cleanup is optional and disabled by default:
+Terminal history cleanup is optional and disabled by default. Durable control-message expiry remains active even when deletion is disabled:
 
 ```json
 {
@@ -139,6 +141,35 @@ Terminal history cleanup is optional and disabled by default:
 ```
 
 Only terminal runs and terminal control messages are eligible. Each status has an independent retention window, cleanup work is bounded per status and cycle, and a run is retained while any control-message history still references it.
+
+## Production Operations
+
+### Delivery and idempotency
+
+Task execution is at least once. Runtime lease fencing prevents a stale worker from updating a reclaimed run, but it cannot undo domain or external side effects completed before a process stopped. Task-owning handlers must therefore make side effects semantically idempotent.
+
+An enqueue deduplication key is active for `(module, task, scope, key)` while the canonical run is queued, leased, running, cancellation-requested, or retry-scheduled. Concurrent callers receive that canonical run. Terminal completion releases the identity; manually retrying a terminal run reacquires it and returns a conflict if another active run already owns the identity. Deduplication is a queue admission guarantee, not an exactly-once side-effect guarantee.
+
+Keep payload-version handlers available while old queued runs can still execute. The runtime stores payload JSON, progress text, errors, requester identities, and control payloads. Do not put credentials or unnecessary personal data in them, keep payloads below the 256 KiB contract limit, and apply the product's database encryption, access, backup, and deletion policy.
+
+### Capacity and leases
+
+- Partition unrelated workloads into worker groups so a slow task class cannot consume every worker slot.
+- Size `MaxConcurrency` from downstream capacity, not CPU alone, and keep `BatchSize` close to the immediately available concurrency on each worker host.
+- Keep `HeartbeatInterval` comfortably below `LeaseDuration`; the default is one third. Allow enough lease time for expected database stalls and deployment jitter.
+- Set `HandlerTimeout` to the task's real upper bound. Set `StaleHeartbeatTimeout` above normal heartbeat and lease jitter so the scanner does not classify healthy work as abandoned.
+- Give each live worker process a unique `WorkerId`. Use a stable pod, machine, or deployment identity for `NodeId`. Lease generation still fences accidental identity reuse, but unique worker identities keep diagnostics trustworthy.
+- Monitor queue depth and oldest-ready age by worker group, active runs, failure and timeout rates, claim latency, handler duration, and retention cleanup failures. Increase concurrency only after the downstream database and services have headroom.
+
+On graceful shutdown the worker stops claiming, cancels in-process handlers, waits for them to exit, and leaves unfinished leases to expire. Give the host enough termination grace for cooperative cancellation and final database writes. Handlers must honor cancellation and tolerate replay. The `tasks.drain` control command is cooperative per run; cluster-wide deployment draining remains a host or orchestrator responsibility.
+
+### Migrations, retention, and reads
+
+Before applying the concurrency migration to an existing database, check active non-null deduplication keys grouped by module, task, scope, and key. Resolve duplicates first: the unique active-identity index intentionally makes unsafe pre-existing duplicates fail deployment instead of silently choosing a winner. Apply migrations before deploying workers that write the new lease and concurrency fields.
+
+Retention stays disabled until the product has approved data-lifecycle values. Enable it only after backup, audit, investigation, and legal needs are understood; tune bounded batches so cleanup does not compete with claims. The bounded lifecycle pass still transitions due pending, delivered, or failed controls to durable `Expired` state on `CleanupInterval`, even when deletion is disabled; worker reads also expire due messages immediately. Terminal expired controls follow `ExpiredControlRetention` once cleanup is enabled.
+
+Admin list reads return total count and deterministic bounded pages. Count and page queries are separate, so operators should treat totals as an eventually consistent snapshot while workers are changing the queue.
 
 ## Boundaries
 

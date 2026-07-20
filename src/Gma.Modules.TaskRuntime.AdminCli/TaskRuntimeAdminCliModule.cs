@@ -81,11 +81,11 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                 {
                     if (!TaskRunStatusNames.TryParseOptional(parseResult.GetValue(statusOption), out TaskRunStatus? status))
                     {
-                        return Result.Failure<IReadOnlyList<TaskRunSummary>>(TaskRuntimeApplicationErrors.InvalidStatus);
+                        return Result.Failure<TaskRunPage>(TaskRuntimeApplicationErrors.InvalidStatus);
                     }
 
                     IRequestDispatcher dispatcher = provider.GetRequiredService<IRequestDispatcher>();
-                    Result<IReadOnlyList<TaskRunSummary>> result = await dispatcher.QueryAsync(
+                    Result<TaskRunPage> result = await dispatcher.QueryAsync(
                         new ListTaskRunsQuery(
                             parseResult.GetValue(moduleOption),
                             parseResult.GetValue(taskOption),
@@ -98,7 +98,11 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
 
                     if (result.IsSuccess)
                     {
-                        WriteRunSummaries(result.Value, parseResult.GetValue(globalOptions.OutputOption) ?? AdminCliOutput.Table);
+                        WriteRunSummaries(
+                            result.Value.Items,
+                            parseResult.GetValue(globalOptions.OutputOption) ?? AdminCliOutput.Table);
+                        AdminCliOutput.WriteMessage(
+                            $"Page {result.Value.Page.ToString(CultureInfo.InvariantCulture)} of {GetPageCount(result.Value).ToString(CultureInfo.InvariantCulture)}; total {result.Value.TotalCount.ToString(CultureInfo.InvariantCulture)}.");
                     }
 
                     return result;
@@ -488,6 +492,11 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
             ]);
         AdminCliOutput.WriteMessage($"Total: {stats.Total.ToString(CultureInfo.InvariantCulture)}");
     }
+
+    private static int GetPageCount(TaskRunPage page) =>
+        page.TotalCount == 0
+            ? 0
+            : (int)Math.Ceiling((double)page.TotalCount / page.PageSize);
 
     private static async Task<Result<string>> ReadPayloadAsync(
         string? payloadJson,

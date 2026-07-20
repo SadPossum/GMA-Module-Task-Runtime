@@ -10,4 +10,4 @@ public sealed record ListTaskRunsQuery(
     TaskRunStatus? Status,
     string? ScopeId,
     int Page,
-    int PageSize) : IQuery<IReadOnlyList<TaskRunSummary>>;
+    int PageSize) : IQuery<TaskRunPage>;

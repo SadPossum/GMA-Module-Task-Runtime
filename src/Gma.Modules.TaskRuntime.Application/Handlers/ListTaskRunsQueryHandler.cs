@@ -6,22 +6,30 @@ using Gma.Framework.Results;
 using Gma.Modules.TaskRuntime.Application.Queries;
 
 internal sealed class ListTaskRunsQueryHandler(ITaskRunStore store)
-    : IQueryHandler<ListTaskRunsQuery, IReadOnlyList<TaskRunSummary>>
+    : IQueryHandler<ListTaskRunsQuery, TaskRunPage>
 {
-    public async Task<Result<IReadOnlyList<TaskRunSummary>>> HandleAsync(
+    public async Task<Result<TaskRunPage>> HandleAsync(
         ListTaskRunsQuery query,
         CancellationToken cancellationToken)
     {
-        TaskRunFilter filter = new(
-            query.ModuleName,
-            query.TaskName,
-            query.WorkerGroup,
-            query.Status,
-            query.ScopeId,
-            query.Page,
-            query.PageSize);
+        TaskRunFilter filter;
+        try
+        {
+            filter = new TaskRunFilter(
+                query.ModuleName,
+                query.TaskName,
+                query.WorkerGroup,
+                query.Status,
+                query.ScopeId,
+                query.Page,
+                query.PageSize);
+        }
+        catch (ArgumentException)
+        {
+            return Result.Failure<TaskRunPage>(TaskRuntimeApplicationErrors.InvalidRunFilter);
+        }
 
-        IReadOnlyList<TaskRunSummary> runs = await store.ListAsync(filter, cancellationToken).ConfigureAwait(false);
-        return Result.Success(runs);
+        TaskRunPage page = await store.ListAsync(filter, cancellationToken).ConfigureAwait(false);
+        return Result.Success(page);
     }
 }

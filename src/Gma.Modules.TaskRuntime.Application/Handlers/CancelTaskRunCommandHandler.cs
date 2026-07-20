@@ -20,30 +20,20 @@ internal sealed class CancelTaskRunCommandHandler(
             return Result.Failure<Unit>(TaskRuntimeApplicationErrors.InvalidRunId);
         }
 
-        TaskRunDetails? run = await store.GetAsync(command.RunId, cancellationToken).ConfigureAwait(false);
-        if (run is null)
-        {
-            return Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunNotFound);
-        }
-
-        TaskRunStatus status = run.Summary.Status;
-        if (status is TaskRunStatus.Canceled or TaskRunStatus.CancellationRequested)
-        {
-            return Result.Success(Unit.Value);
-        }
-
-        if (!TaskRunStatusTransitions.CanRequestCancellation(status))
-        {
-            return Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunCannotBeCanceled);
-        }
-
-        await store.RequestCancellationAsync(
+        TaskRunMutationOutcome outcome = await store.RequestCancellationAsync(
                 command.RunId,
                 command.RequestedBy,
                 clock.UtcNow,
                 cancellationToken)
             .ConfigureAwait(false);
 
-        return Result.Success(Unit.Value);
+        return outcome switch
+        {
+            TaskRunMutationOutcome.Applied or TaskRunMutationOutcome.AlreadyApplied => Result.Success(Unit.Value),
+            TaskRunMutationOutcome.NotFound => Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunNotFound),
+            TaskRunMutationOutcome.Conflict => Result.Failure<Unit>(TaskRuntimeApplicationErrors.ConcurrentMutation),
+            TaskRunMutationOutcome.InvalidRequest => Result.Failure<Unit>(TaskRuntimeApplicationErrors.InvalidRunRequest),
+            _ => Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunCannotBeCanceled)
+        };
     }
 }

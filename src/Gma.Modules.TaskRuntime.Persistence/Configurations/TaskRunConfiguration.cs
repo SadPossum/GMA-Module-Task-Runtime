@@ -19,6 +19,8 @@ internal sealed class TaskRunConfiguration : IEntityTypeConfiguration<TaskRun>
         builder.Property(taskRun => taskRun.Status).HasConversion<int>().IsRequired();
         builder.Property(taskRun => taskRun.Payload).HasMaxLength(TaskRunRequest.PayloadMaxLength).IsRequired();
         builder.Property(taskRun => taskRun.DeduplicationKey).HasMaxLength(TaskRun.DeduplicationKeyMaxLength);
+        builder.Property(taskRun => taskRun.ActiveDeduplicationIdentity)
+            .HasMaxLength(TaskRunRequest.DeduplicationIdentityMaxLength);
         builder.Property(taskRun => taskRun.ScopeId).HasMaxLength(ScopeIds.MaxLength);
         builder.Property(taskRun => taskRun.RequestedBy).HasMaxLength(TaskNames.ActorMaxLength);
         builder.Property(taskRun => taskRun.LockedBy).HasMaxLength(TaskRun.WorkerIdMaxLength);
@@ -26,6 +28,9 @@ internal sealed class TaskRunConfiguration : IEntityTypeConfiguration<TaskRun>
         builder.Property(taskRun => taskRun.ProgressMessage).HasMaxLength(TaskRun.ProgressMessageMaxLength);
         builder.Property(taskRun => taskRun.LastError).HasMaxLength(TaskRun.ErrorMaxLength);
         builder.Property(taskRun => taskRun.CancellationRequestedBy).HasMaxLength(TaskNames.ActorMaxLength);
+        builder.Property(taskRun => taskRun.LeaseGeneration).IsRequired();
+        builder.Property(taskRun => taskRun.ConcurrencyVersion).IsConcurrencyToken().IsRequired();
+        builder.HasIndex(taskRun => taskRun.ActiveDeduplicationIdentity).IsUnique();
         builder.HasIndex(taskRun => new
         {
             taskRun.WorkerGroup,
@@ -34,7 +39,15 @@ internal sealed class TaskRunConfiguration : IEntityTypeConfiguration<TaskRun>
             taskRun.NextAttemptAtUtc,
             taskRun.LockedUntilUtc
         });
+        builder.HasIndex(taskRun => new
+        {
+            taskRun.WorkerGroup,
+            taskRun.ScheduledAtUtc,
+            taskRun.CreatedAtUtc,
+            taskRun.Id
+        });
         builder.HasIndex(taskRun => new { taskRun.ModuleName, taskRun.TaskName });
+        builder.HasIndex(taskRun => new { taskRun.ScopeId, taskRun.CreatedAtUtc });
         builder.HasIndex(taskRun => new { taskRun.Status, taskRun.CompletedAtUtc });
         builder.HasIndex(taskRun => new
         {

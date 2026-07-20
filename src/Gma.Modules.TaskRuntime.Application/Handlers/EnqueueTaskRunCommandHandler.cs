@@ -31,27 +31,31 @@ internal sealed class EnqueueTaskRunCommandHandler(
         }
 
         DateTimeOffset scheduledAtUtc = command.ScheduledAtUtc ?? nowUtc;
-        TaskRunRequest request = new(
-            runId,
-            command.ModuleName,
-            command.TaskName,
-            command.PayloadJson,
-            nowUtc,
-            scheduledAtUtc,
-            command.WorkerGroup,
-            command.ScopeId,
-            command.CorrelationId,
-            command.RequestedBy,
-            command.MaxAttempts,
-            command.PayloadVersion,
-            command.DeduplicationKey);
+        TaskRunRequest request;
+        try
+        {
+            request = new TaskRunRequest(
+                runId,
+                command.ModuleName,
+                command.TaskName,
+                command.PayloadJson,
+                nowUtc,
+                scheduledAtUtc,
+                command.WorkerGroup,
+                command.ScopeId,
+                command.CorrelationId,
+                command.RequestedBy,
+                command.MaxAttempts,
+                command.PayloadVersion,
+                command.DeduplicationKey);
+        }
+        catch (ArgumentException)
+        {
+            return Result.Failure<TaskRunDetails>(TaskRuntimeApplicationErrors.InvalidRunRequest);
+        }
 
-        await store.EnqueueAsync(request, cancellationToken).ConfigureAwait(false);
-
-        TaskRunDetails? run = await store.GetAsync(runId, cancellationToken).ConfigureAwait(false);
-        return run is null
-            ? Result.Failure<TaskRunDetails>(TaskRuntimeApplicationErrors.RunNotFound)
-            : Result.Success(run);
+        TaskRunEnqueueResult enqueue = await store.EnqueueAsync(request, cancellationToken).ConfigureAwait(false);
+        return Result.Success(enqueue.Run);
     }
 
     private static bool IsValidJson(string payloadJson)
@@ -61,7 +65,7 @@ internal sealed class EnqueueTaskRunCommandHandler(
             using JsonDocument _ = JsonDocument.Parse(payloadJson);
             return true;
         }
-        catch (JsonException)
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
         {
             return false;
         }

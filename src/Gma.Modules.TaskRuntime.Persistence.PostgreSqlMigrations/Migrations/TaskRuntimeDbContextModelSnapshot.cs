@@ -37,6 +37,10 @@ namespace Gma.Modules.TaskRuntime.Persistence.PostgreSqlMigrations.Migrations
                     b.Property<DateTimeOffset?>("CompletedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("ConcurrencyVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset?>("DeliveredAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -69,6 +73,8 @@ namespace Gma.Modules.TaskRuntime.Persistence.PostgreSqlMigrations.Migrations
 
                     b.HasIndex("Status", "CompletedAtUtc");
 
+                    b.HasIndex("Status", "ExpiresAtUtc");
+
                     b.HasIndex("RunId", "Status", "EnqueuedAtUtc");
 
                     b.ToTable("task_control_messages", "tasks");
@@ -79,6 +85,10 @@ namespace Gma.Modules.TaskRuntime.Persistence.PostgreSqlMigrations.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ActiveDeduplicationIdentity")
+                        .HasMaxLength(768)
+                        .HasColumnType("character varying(768)");
 
                     b.Property<int>("Attempts")
                         .HasColumnType("integer");
@@ -92,6 +102,10 @@ namespace Gma.Modules.TaskRuntime.Persistence.PostgreSqlMigrations.Migrations
 
                     b.Property<DateTimeOffset?>("CompletedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ConcurrencyVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("CorrelationId")
                         .HasColumnType("uuid");
@@ -109,6 +123,9 @@ namespace Gma.Modules.TaskRuntime.Persistence.PostgreSqlMigrations.Migrations
 
                     b.Property<DateTimeOffset?>("LastHeartbeatAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LeaseGeneration")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("LeasedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -179,9 +196,16 @@ namespace Gma.Modules.TaskRuntime.Persistence.PostgreSqlMigrations.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ActiveDeduplicationIdentity")
+                        .IsUnique();
+
                     b.HasIndex("ModuleName", "TaskName");
 
+                    b.HasIndex("ScopeId", "CreatedAtUtc");
+
                     b.HasIndex("Status", "CompletedAtUtc");
+
+                    b.HasIndex("WorkerGroup", "ScheduledAtUtc", "CreatedAtUtc", "Id");
 
                     b.HasIndex("ModuleName", "TaskName", "ScopeId", "DeduplicationKey", "Status");
 

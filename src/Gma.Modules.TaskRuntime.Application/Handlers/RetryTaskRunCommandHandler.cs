@@ -20,30 +20,20 @@ internal sealed class RetryTaskRunCommandHandler(
             return Result.Failure<Unit>(TaskRuntimeApplicationErrors.InvalidRunId);
         }
 
-        TaskRunDetails? run = await store.GetAsync(command.RunId, cancellationToken).ConfigureAwait(false);
-        if (run is null)
-        {
-            return Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunNotFound);
-        }
-
-        if (!CanRetry(run.Summary.Status))
-        {
-            return Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunCannotBeRetried);
-        }
-
-        await store.RetryAsync(
+        TaskRunMutationOutcome outcome = await store.RetryAsync(
                 command.RunId,
                 command.RequestedBy,
                 command.ScheduledAtUtc ?? clock.UtcNow,
                 cancellationToken)
             .ConfigureAwait(false);
 
-        return Result.Success(Unit.Value);
+        return outcome switch
+        {
+            TaskRunMutationOutcome.Applied => Result.Success(Unit.Value),
+            TaskRunMutationOutcome.NotFound => Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunNotFound),
+            TaskRunMutationOutcome.Conflict => Result.Failure<Unit>(TaskRuntimeApplicationErrors.ConcurrentMutation),
+            TaskRunMutationOutcome.InvalidRequest => Result.Failure<Unit>(TaskRuntimeApplicationErrors.InvalidRunRequest),
+            _ => Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunCannotBeRetried)
+        };
     }
-
-    private static bool CanRetry(TaskRunStatus status) =>
-        TaskRunStatusTransitions.RequireKnown(status) is TaskRunStatus.Failed or
-            TaskRunStatus.TimedOut or
-            TaskRunStatus.Canceled or
-            TaskRunStatus.RetryScheduled;
 }

@@ -12,14 +12,21 @@ internal sealed class GetTaskRunStatsQueryHandler(ITaskRunStore store)
         GetTaskRunStatsQuery query,
         CancellationToken cancellationToken)
     {
-        TaskRunStats stats = await store.GetStatsAsync(
-                new TaskRunStatsFilter(
-                    query.ModuleName,
-                    query.TaskName,
-                    query.WorkerGroup,
-                    query.ScopeId),
-                cancellationToken)
-            .ConfigureAwait(false);
+        TaskRunStatsFilter filter;
+        try
+        {
+            filter = new TaskRunStatsFilter(
+                query.ModuleName,
+                query.TaskName,
+                query.WorkerGroup,
+                query.ScopeId);
+        }
+        catch (ArgumentException)
+        {
+            return Result.Failure<TaskRunStats>(TaskRuntimeApplicationErrors.InvalidRunFilter);
+        }
+
+        TaskRunStats stats = await store.GetStatsAsync(filter, cancellationToken).ConfigureAwait(false);
 
         return Result.Success(stats);
     }

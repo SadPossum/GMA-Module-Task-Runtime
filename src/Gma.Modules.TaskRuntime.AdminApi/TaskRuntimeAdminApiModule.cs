@@ -58,7 +58,7 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
                 token =>
                 {
                     return !TaskRunStatusNames.TryParseOptional(status, out TaskRunStatus? parsedStatus)
-                        ? Task.FromResult(Result.Failure<IReadOnlyList<TaskRunSummary>>(TaskRuntimeApplicationErrors.InvalidStatus))
+                        ? Task.FromResult(Result.Failure<TaskRunPage>(TaskRuntimeApplicationErrors.InvalidStatus))
                         : dispatcher.QueryAsync(
                             new ListTaskRunsQuery(
                                 module,
@@ -233,5 +233,8 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
         new(TaskRuntimeApplicationErrors.RunCannotBeCanceled.Code, StatusCodes.Status409Conflict),
         new(TaskRuntimeApplicationErrors.RunCannotBeRetried.Code, StatusCodes.Status409Conflict),
         new(TaskRuntimeApplicationErrors.RunCannotBeControlled.Code, StatusCodes.Status409Conflict),
-        new(TaskRuntimeApplicationErrors.InvalidControlMessage.Code, StatusCodes.Status400BadRequest));
+        new(TaskRuntimeApplicationErrors.InvalidControlMessage.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeApplicationErrors.InvalidRunRequest.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeApplicationErrors.InvalidRunFilter.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeApplicationErrors.ConcurrentMutation.Code, StatusCodes.Status409Conflict));
 }

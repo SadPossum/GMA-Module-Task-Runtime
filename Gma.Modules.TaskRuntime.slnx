@@ -1,9 +1,12 @@
 <Solution>
   <Folder Name="/docs/">
     <File Path="docs/README.md" />
+    <File Path="docs/task-runtime-production-hardening-task.md" />
   </Folder>
   <Folder Name="/eng/">
     <File Path="eng/bootstrap-source-roots.ps1" />
+    <File Path="eng/check-boundaries.ps1" />
+    <File Path="eng/check-migrations.ps1" />
   </Folder>
   <Folder Name="/.github/workflows/">
     <File Path=".github/workflows/validate.yml" />
@@ -35,5 +38,9 @@
     <Project Path="src/Gma.Modules.TaskRuntime.Persistence.PostgreSqlMigrations/Gma.Modules.TaskRuntime.Persistence.PostgreSqlMigrations.csproj" />
     <Project Path="src/Gma.Modules.TaskRuntime.Persistence.SqlServerMigrations/Gma.Modules.TaskRuntime.Persistence.SqlServerMigrations.csproj" />
     <Project Path="src/Gma.Modules.TaskRuntime.Persistence/Gma.Modules.TaskRuntime.Persistence.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Gma.Modules.TaskRuntime.IntegrationTests/Gma.Modules.TaskRuntime.IntegrationTests.csproj" />
+    <Project Path="tests/Gma.Modules.TaskRuntime.Tests/Gma.Modules.TaskRuntime.Tests.csproj" />
   </Folder>
 </Solution>

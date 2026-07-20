@@ -4,6 +4,7 @@ using Gma.Modules.TaskRuntime.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Gma.Modules.TaskRuntime.Persistence.SqlServerMigrations.Migrations
 {
     [DbContext(typeof(TaskRuntimeDbContext))]
-    partial class TaskRuntimeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260720001538_HardenTaskRuntimeConcurrency")]
+    partial class HardenTaskRuntimeConcurrency
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

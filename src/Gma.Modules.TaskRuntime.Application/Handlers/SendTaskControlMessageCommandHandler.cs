@@ -28,17 +28,6 @@ internal sealed class SendTaskControlMessageCommandHandler(
             return Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.InvalidPayloadJson);
         }
 
-        TaskRunDetails? run = await store.GetAsync(command.RunId, cancellationToken).ConfigureAwait(false);
-        if (run is null)
-        {
-            return Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.RunNotFound);
-        }
-
-        if (TaskRunStatusTransitions.IsTerminal(run.Summary.Status))
-        {
-            return Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.RunCannotBeControlled);
-        }
-
         DateTimeOffset nowUtc = clock.UtcNow;
         TaskControlMessage message;
         try
@@ -57,9 +46,20 @@ internal sealed class SendTaskControlMessageCommandHandler(
             return Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.InvalidControlMessage);
         }
 
-        await store.EnqueueControlMessageAsync(message, cancellationToken).ConfigureAwait(false);
+        TaskControlMessageEnqueueOutcome outcome = await store
+            .EnqueueControlMessageAsync(message, cancellationToken)
+            .ConfigureAwait(false);
 
-        return Result.Success(message);
+        return outcome switch
+        {
+            TaskControlMessageEnqueueOutcome.Enqueued or TaskControlMessageEnqueueOutcome.AlreadyExists =>
+                Result.Success(message),
+            TaskControlMessageEnqueueOutcome.RunNotFound =>
+                Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.RunNotFound),
+            TaskControlMessageEnqueueOutcome.Conflict =>
+                Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.ConcurrentMutation),
+            _ => Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.RunCannotBeControlled)
+        };
     }
 
     private static bool IsValidJson(string payloadJson)
@@ -69,7 +69,7 @@ internal sealed class SendTaskControlMessageCommandHandler(
             using JsonDocument _ = JsonDocument.Parse(payloadJson);
             return true;
         }
-        catch (JsonException)
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
         {
             return false;
         }
