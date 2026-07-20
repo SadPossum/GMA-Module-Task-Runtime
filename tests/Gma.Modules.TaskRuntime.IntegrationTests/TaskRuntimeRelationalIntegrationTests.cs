@@ -5,6 +5,7 @@ using Gma.Framework.Tasks;
 using Gma.Modules.TaskRuntime.IntegrationTests.Support;
 using Gma.Modules.TaskRuntime.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -186,6 +187,39 @@ public sealed class TaskRuntimeRelationalIntegrationTests
                     .Where(message => message.Id == controlId)
                     .Select(message => message.Status)
                     .SingleAsync());
+        }
+
+        Guid concurrentControlId = Guid.CreateVersion7();
+        TaskControlMessageEnqueueOutcome concurrentControlOutcome = await EnqueueControlAsync(
+            options,
+            clock,
+            new TaskControlMessage(
+                concurrentControlId,
+                reclaimedRunId,
+                "tasks.pause",
+                "{}",
+                Now.AddSeconds(24),
+                "operator",
+                Now.AddSeconds(30)));
+        TaskRunMutationOutcome concurrentHeartbeatOutcome = TaskRunMutationOutcome.Conflict;
+        DbContextOptionsBuilder<TaskRuntimeDbContext> pollingOptions = new();
+        ConfigureProvider(pollingOptions, provider, connectionString);
+        pollingOptions.AddInterceptors(new OneShotSaveChangesInterceptor(async cancellationToken =>
+        {
+            concurrentHeartbeatOutcome = await ReportHeartbeatAsync(
+                options,
+                clock,
+                secondLease.CreateExecutionContext(),
+                Now.AddSeconds(24));
+        }));
+        await using (TaskRuntimeDbContext pollingContext = new(pollingOptions.Options))
+        {
+            IReadOnlyList<TaskControlMessage> concurrentlyRead = await new TaskRuntimeRunStore(pollingContext, clock)
+                .ReadPendingAsync(secondLease.CreateExecutionContext(), 10, CancellationToken.None);
+
+            Assert.Equal(TaskControlMessageEnqueueOutcome.Enqueued, concurrentControlOutcome);
+            Assert.Equal(TaskRunMutationOutcome.Applied, concurrentHeartbeatOutcome);
+            Assert.Equal(concurrentControlId, Assert.Single(concurrentlyRead).MessageId);
         }
 
         Guid unreadExpiredControlId = Guid.CreateVersion7();
@@ -585,5 +619,24 @@ public sealed class TaskRuntimeRelationalIntegrationTests
     private sealed class MutableClock(DateTimeOffset utcNow) : ISystemClock
     {
         public DateTimeOffset UtcNow { get; set; } = utcNow;
+    }
+
+    private sealed class OneShotSaveChangesInterceptor(Func<CancellationToken, Task> beforeFirstSave)
+        : SaveChangesInterceptor
+    {
+        private int invoked;
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Exchange(ref this.invoked, 1) == 0)
+            {
+                await beforeFirstSave(cancellationToken);
+            }
+
+            return result;
+        }
     }
 }

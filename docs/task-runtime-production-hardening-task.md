@@ -1,6 +1,6 @@
 # TaskRuntime Production Hardening Task
 
-Status: implementation verified; publication and downstream alignment pending
+Status: module implementation and verification complete; downstream alignment in progress
 Date: 2026-07-19
 
 ## Goal
@@ -65,9 +65,9 @@ Make the optional TaskRuntime module production-ready for durable queued work, r
 
 ## Current Evidence
 
-- implementation was based on Framework head `4f88cd4`, TaskRuntime head `5dc0d38` and Skeleton head `7b3b4b9`; publication will replace these with exact verified heads;
-- Framework build and all 972 tests pass, including lease-generation fencing, rejected worker transition behavior, bounded paging and delayed control expiry semantics;
+- Framework is published at `017cfd7`; its build and all 972 tests pass, including lease-generation fencing, rejected worker transition behavior, bounded paging, delayed control expiry and retry-safe control delivery during concurrent heartbeats;
 - standalone TaskRuntime build passes with 20 application tests, reusable-module boundary checks, SQL Server/PostgreSQL migration-drift checks and a transitive package audit with no known vulnerable packages;
-- required relational tests pass against real PostgreSQL and SQL Server containers, covering concurrent canonical deduplication, case-sensitive scope parity, disjoint skip-locked claims, reused-worker lease fencing, heartbeat/timeout, completion/cancel and retry races, stale control reads, durable expiry without a worker, retention and total-count pagination;
-- Skeleton-owned provider persistence scenarios remain to be reduced to composition coverage after the Framework and TaskRuntime heads are published;
-- Skeleton and BunkFy exact-pin builds and CI remain the final acceptance gate for this slice.
+- required relational tests pass against real PostgreSQL and SQL Server containers, covering concurrent canonical deduplication, case-sensitive scope parity, disjoint skip-locked claims, reused-worker lease fencing, heartbeat/timeout, completion/cancel and retry races, concurrent heartbeat/control delivery, stale control reads, durable expiry without a worker, retention and total-count pagination;
+- Skeleton-owned TaskRuntime tests now cover only hosted sample execution, cooperative control and cross-module projection rebuild composition; provider persistence scenarios live in this module;
+- the Skeleton build and focused worker, projection-rebuild and cooperative-control Docker tests pass against the published Framework head and the current TaskRuntime source;
+- exact Skeleton and BunkFy pins, their full validation lanes and downstream CI remain the final acceptance gate for this slice.
