@@ -1,6 +1,6 @@
 # TaskRuntime Production Hardening Task
 
-Status: module implementation and verification complete; downstream alignment in progress
+Status: slice complete; implementation, publication and downstream alignment verified
 Date: 2026-07-19
 
 ## Goal
@@ -65,9 +65,10 @@ Make the optional TaskRuntime module production-ready for durable queued work, r
 
 ## Current Evidence
 
-- Framework is published at `017cfd7`; its build and all 972 tests pass, including lease-generation fencing, rejected worker transition behavior, bounded paging, delayed control expiry and retry-safe control delivery during concurrent heartbeats;
-- standalone TaskRuntime build passes with 20 application tests, reusable-module boundary checks, SQL Server/PostgreSQL migration-drift checks and a transitive package audit with no known vulnerable packages;
+- Framework is published at `017cfd7`; its build and all 972 tests pass, including lease-generation fencing, rejected worker transition behavior, bounded paging, delayed control expiry and retry-safe control delivery during concurrent heartbeats, and its exact-head `validate` workflow is green;
+- standalone TaskRuntime is published at `2e5d842`; its build passes with 20 application tests, reusable-module boundary checks, SQL Server/PostgreSQL migration-drift checks and a transitive package audit with no known vulnerable packages, and its exact-head `validate` workflow is green;
 - required relational tests pass against real PostgreSQL and SQL Server containers, covering concurrent canonical deduplication, case-sensitive scope parity, disjoint skip-locked claims, reused-worker lease fencing, heartbeat/timeout, completion/cancel and retry races, concurrent heartbeat/control delivery, stale control reads, durable expiry without a worker, retention and total-count pagination;
 - Skeleton-owned TaskRuntime tests now cover only hosted sample execution, cooperative control and cross-module projection rebuild composition; provider persistence scenarios live in this module;
-- the Skeleton build and focused worker, projection-rebuild and cooperative-control Docker tests pass against the published Framework head and the current TaskRuntime source;
-- exact Skeleton and BunkFy pins, their full validation lanes and downstream CI remain the final acceptance gate for this slice.
+- Skeleton `5873ea7` pins the published Framework and TaskRuntime heads; its canonical build, 1,836 fast tests, migration-drift checks and focused worker, projection-rebuild and cooperative-control Docker tests pass, and its exact-head `Validate` workflow is green;
+- BunkFy Backend `13860d4` pins the published heads, exposes the standalone TaskRuntime tests in its solution, removes duplicate generic provider/runtime test infrastructure and retains its product-owned worker coverage; its zero-warning build, 1,955 fast tests, 18 migration-drift checks and adapter-through-runtime Docker test pass, and its exact-head Windows/Linux `validate` and Docker workflows are green;
+- BunkFy root `791d614` records the aligned backend and root solution graph, and its full backend/frontend `validate` workflow is green.
