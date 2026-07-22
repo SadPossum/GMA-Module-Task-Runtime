@@ -162,7 +162,9 @@ internal sealed class TaskRuntimeRetentionService(
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Failed to expire task control messages; the next lifecycle cycle will retry.");
+            logger.LogError(
+                "Failed to expire task control messages with {ExceptionType}; the next lifecycle cycle will retry.",
+                exception.GetType().Name);
         }
     }
 
@@ -240,10 +242,10 @@ internal sealed class TaskRuntimeRetentionService(
         catch (Exception exception)
         {
             logger.LogError(
-                exception,
-                "Failed to clean terminal task {RecordKind} records with status {Status}; other statuses will continue.",
+                "Failed to clean terminal task {RecordKind} records with status {Status} using {ExceptionType}; other statuses will continue.",
                 recordKind,
-                status);
+                status,
+                exception.GetType().Name);
         }
     }
 }
