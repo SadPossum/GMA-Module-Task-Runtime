@@ -4,6 +4,7 @@ using Gma.Modules.TaskRuntime.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Gma.Modules.TaskRuntime.Persistence.SqlServerMigrations.Migrations
 {
     [DbContext(typeof(TaskRuntimeDbContext))]
-    partial class TaskRuntimeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260804062431_AddTaskRuntimeScopeLifecycle")]
+    partial class AddTaskRuntimeScopeLifecycle
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -288,7 +291,7 @@ namespace Gma.Modules.TaskRuntime.Persistence.SqlServerMigrations.Migrations
                         {
                             t.HasCheckConstraint("CK_task_scope_destroy_operations_batch", "\"BatchSize\" >= 1 AND \"BatchSize\" <= 1000");
 
-                            t.HasCheckConstraint("CK_task_scope_destroy_operations_counts", "((\"RemovedRecordCount\" = 0 AND \"CompletedBatchCount\" = 0) OR (\"RemovedRecordCount\" > 0 AND \"CompletedBatchCount\" > 0)) AND \"ProofVersion\" = 1 AND \"ConcurrencyVersion\" >= 1 AND \"UpdatedAtUtc\" >= \"StartedAtUtc\"");
+                            t.HasCheckConstraint("CK_task_scope_destroy_operations_counts", "\"RemovedRecordCount\" >= 0 AND \"CompletedBatchCount\" >= 0");
 
                             t.HasCheckConstraint("CK_task_scope_destroy_operations_revision", "\"SelectedRevision\" >= 0 AND \"ResultingRevision\" = \"SelectedRevision\" + 1");
 
@@ -351,16 +354,12 @@ namespace Gma.Modules.TaskRuntime.Persistence.SqlServerMigrations.Migrations
 
                     b.ToTable("task_scope_destroy_receipts", "tasks", t =>
                         {
-                            t.HasTrigger("task_scope_destroy_receipts_append_only");
-
                             t.HasCheckConstraint("CK_task_scope_destroy_receipts_batch", "\"BatchSize\" >= 1 AND \"BatchSize\" <= 1000");
 
-                            t.HasCheckConstraint("CK_task_scope_destroy_receipts_counts", "((\"RemovedRecordCount\" = 0 AND \"CompletedBatchCount\" = 0) OR (\"RemovedRecordCount\" > 0 AND \"CompletedBatchCount\" > 0)) AND \"RemovalProofVersion\" = 1 AND \"CompletedAtUtc\" >= \"StartedAtUtc\"");
+                            t.HasCheckConstraint("CK_task_scope_destroy_receipts_counts", "\"RemovedRecordCount\" >= 0 AND \"CompletedBatchCount\" >= 0");
 
                             t.HasCheckConstraint("CK_task_scope_destroy_receipts_revision", "\"SelectedRevision\" >= 0 AND \"ResultingRevision\" = \"SelectedRevision\" + 1");
                         });
-
-                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
             modelBuilder.Entity("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeState", b =>
@@ -410,16 +409,10 @@ namespace Gma.Modules.TaskRuntime.Persistence.SqlServerMigrations.Migrations
 
                     b.ToTable("task_scope_states", "tasks", t =>
                         {
-                            t.HasTrigger("task_scope_states_closed_immutable");
-
-                            t.HasCheckConstraint("CK_task_scope_states_progress", "\"ConcurrencyVersion\" >= 1 AND \"UpdatedAtUtc\" >= \"StartedAtUtc\"");
-
                             t.HasCheckConstraint("CK_task_scope_states_revision", "\"SelectedRevision\" >= 0 AND \"ResultingRevision\" = \"SelectedRevision\" + 1");
 
-                            t.HasCheckConstraint("CK_task_scope_states_status", "(\"Status\" = 1 AND \"ClosedAtUtc\" IS NULL) OR (\"Status\" = 2 AND \"ClosedAtUtc\" IS NOT NULL AND \"ClosedAtUtc\" = \"UpdatedAtUtc\")");
+                            t.HasCheckConstraint("CK_task_scope_states_status", "\"Status\" IN (1, 2)");
                         });
-
-                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
             modelBuilder.Entity("Gma.Framework.Tasks.Infrastructure.TaskControlMessageState", b =>
@@ -427,24 +420,6 @@ namespace Gma.Modules.TaskRuntime.Persistence.SqlServerMigrations.Migrations
                     b.HasOne("Gma.Framework.Tasks.Infrastructure.TaskRun", null)
                         .WithMany()
                         .HasForeignKey("RunId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeDestroyOperation", b =>
-                {
-                    b.HasOne("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeState", null)
-                        .WithMany()
-                        .HasForeignKey("ScopeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeDestroyReceipt", b =>
-                {
-                    b.HasOne("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeState", null)
-                        .WithMany()
-                        .HasForeignKey("ScopeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

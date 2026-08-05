@@ -51,6 +51,23 @@ public sealed class TaskRuntimeApplicationHandlerTests
         Assert.Null(store.LastEnqueueRequest);
     }
 
+    [Fact]
+    public async Task Enqueue_maps_closed_scope_to_a_stable_error()
+    {
+        StubTaskRunStore store = new() { RejectEnqueue = true };
+        EnqueueTaskRunCommandHandler handler = new(
+            store,
+            new FixedIdGenerator(RequestedRunId),
+            new FixedClock(Now));
+
+        Result<TaskRunDetails> result = await handler.HandleAsync(
+            CreateEnqueueCommand(RequestedRunId),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TaskRuntimeApplicationErrors.ScopeClosed, result.Error);
+    }
+
     [Theory]
     [InlineData(TaskRunMutationOutcome.Applied, true, null)]
     [InlineData(TaskRunMutationOutcome.AlreadyApplied, true, null)]
@@ -80,6 +97,7 @@ public sealed class TaskRuntimeApplicationHandlerTests
     [InlineData(TaskControlMessageEnqueueOutcome.RunNotFound, false, "TaskRuntime.RunNotFound")]
     [InlineData(TaskControlMessageEnqueueOutcome.RunTerminal, false, "TaskRuntime.RunCannotBeControlled")]
     [InlineData(TaskControlMessageEnqueueOutcome.Conflict, false, "TaskRuntime.ConcurrentMutation")]
+    [InlineData(TaskControlMessageEnqueueOutcome.ScopeClosed, false, "TaskRuntime.ScopeClosed")]
     public async Task Control_maps_atomic_store_outcomes(
         TaskControlMessageEnqueueOutcome outcome,
         bool success,
@@ -110,6 +128,7 @@ public sealed class TaskRuntimeApplicationHandlerTests
     [InlineData(TaskRunMutationOutcome.InvalidState, false, "TaskRuntime.RunCannotBeRetried")]
     [InlineData(TaskRunMutationOutcome.Conflict, false, "TaskRuntime.ConcurrentMutation")]
     [InlineData(TaskRunMutationOutcome.InvalidRequest, false, "TaskRuntime.InvalidRunRequest")]
+    [InlineData(TaskRunMutationOutcome.ScopeClosed, false, "TaskRuntime.ScopeClosed")]
     public async Task Retry_maps_atomic_store_outcomes(
         TaskRunMutationOutcome outcome,
         bool success,
@@ -215,11 +234,17 @@ public sealed class TaskRuntimeApplicationHandlerTests
         public TaskRunMutationOutcome CancellationOutcome { get; init; } = TaskRunMutationOutcome.Applied;
         public TaskRunMutationOutcome RetryOutcome { get; init; } = TaskRunMutationOutcome.Applied;
         public TaskControlMessageEnqueueOutcome ControlOutcome { get; init; } = TaskControlMessageEnqueueOutcome.Enqueued;
+        public bool RejectEnqueue { get; init; }
         public TaskRunRequest? LastEnqueueRequest { get; private set; }
 
         public Task<TaskRunEnqueueResult> EnqueueAsync(TaskRunRequest request, CancellationToken cancellationToken)
         {
             this.LastEnqueueRequest = request;
+            if (this.RejectEnqueue)
+            {
+                throw new TaskScopeNotAcceptingWorkException();
+            }
+
             return Task.FromResult(this.EnqueueResult);
         }
 

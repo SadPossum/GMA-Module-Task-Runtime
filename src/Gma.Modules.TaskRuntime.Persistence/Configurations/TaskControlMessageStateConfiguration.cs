@@ -1,5 +1,6 @@
 namespace Gma.Modules.TaskRuntime.Persistence.Configurations;
 
+using Gma.Framework.Naming;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Gma.Framework.Tasks;
@@ -12,13 +13,19 @@ internal sealed class TaskControlMessageStateConfiguration : IEntityTypeConfigur
         builder.ToTable("task_control_messages");
         builder.HasKey(message => message.Id);
         builder.Property(message => message.CommandName).HasMaxLength(TaskControlMessageState.CommandNameMaxLength).IsRequired();
+        builder.Property(message => message.ScopeId).HasMaxLength(ScopeIds.MaxLength);
         builder.Property(message => message.Payload).HasMaxLength(TaskControlMessage.PayloadMaxLength).IsRequired();
         builder.Property(message => message.RequestedBy).HasMaxLength(TaskControlMessageState.RequestedByMaxLength);
         builder.Property(message => message.Status).HasConversion<int>().IsRequired();
         builder.Property(message => message.LastError).HasMaxLength(TaskRun.ErrorMaxLength);
         builder.Property(message => message.ConcurrencyVersion).IsConcurrencyToken().IsRequired();
         builder.HasIndex(message => new { message.RunId, message.Status, message.EnqueuedAtUtc });
+        builder.HasIndex(message => new { message.ScopeId, message.Id });
         builder.HasIndex(message => new { message.Status, message.ExpiresAtUtc });
         builder.HasIndex(message => new { message.Status, message.CompletedAtUtc });
+        builder.HasOne<TaskRun>()
+            .WithMany()
+            .HasForeignKey(message => message.RunId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

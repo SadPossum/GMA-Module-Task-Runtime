@@ -18,4 +18,5 @@ public static class TaskRuntimeApplicationErrors
     public static readonly Error InvalidRunRequest = new("TaskRuntime.InvalidRunRequest", "The task run request is invalid.");
     public static readonly Error InvalidRunFilter = new("TaskRuntime.InvalidRunFilter", "The task run filter is invalid.");
     public static readonly Error ConcurrentMutation = new("TaskRuntime.ConcurrentMutation", "The task run changed concurrently. Retry the operation.");
+    public static readonly Error ScopeClosed = new("TaskRuntime.ScopeClosed", "The task scope is not accepting new work.");
 }

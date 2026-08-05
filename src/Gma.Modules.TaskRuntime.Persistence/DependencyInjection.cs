@@ -9,6 +9,7 @@ using Gma.Framework.Tasks;
 using Gma.Framework.Cqrs.UnitOfWork;
 using Gma.Framework.ModuleComposition;
 using Gma.Framework.Persistence.EntityFrameworkCore;
+using Gma.Modules.TaskRuntime.Contracts;
 
 public static class DependencyInjection
 {
@@ -38,6 +39,9 @@ public static class DependencyInjection
         builder.Services.TryAddScoped<ITaskRunStore, TaskRuntimeRunStore>();
         builder.Services.TryAddScoped<ITaskRuntimeReporter>(provider => provider.GetRequiredService<ITaskRunStore>());
         builder.Services.TryAddScoped<ITaskControlChannel>(provider => provider.GetRequiredService<ITaskRunStore>());
+        builder.Services.TryAddScoped<
+            ITaskRuntimeScopeLifecycle,
+            TaskRuntimeScopeLifecycleService>();
         builder.Services.TryAddEnumerable(ServiceDescriptor.Scoped<IUnitOfWork, TaskRuntimeUnitOfWork>());
         builder.ProvideFeature(TasksCompositionFeatures.RunStoreProvided("Gma.Modules.TaskRuntime.Persistence"));
         builder.ProvideFeature(TasksCompositionFeatures.RuntimeReporterProvided("Gma.Modules.TaskRuntime.Persistence"));

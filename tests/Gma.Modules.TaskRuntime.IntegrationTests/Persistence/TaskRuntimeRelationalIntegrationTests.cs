@@ -15,7 +15,7 @@ using Xunit;
 
 [Trait("Category", "Docker")]
 [Trait("Category", "Integration")]
-public sealed class TaskRuntimeRelationalIntegrationTests
+public sealed partial class TaskRuntimeRelationalIntegrationTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 19, 21, 0, 0, TimeSpan.Zero);
 

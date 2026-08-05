@@ -54,8 +54,15 @@ internal sealed class EnqueueTaskRunCommandHandler(
             return Result.Failure<TaskRunDetails>(TaskRuntimeApplicationErrors.InvalidRunRequest);
         }
 
-        TaskRunEnqueueResult enqueue = await store.EnqueueAsync(request, cancellationToken).ConfigureAwait(false);
-        return Result.Success(enqueue.Run);
+        try
+        {
+            TaskRunEnqueueResult enqueue = await store.EnqueueAsync(request, cancellationToken).ConfigureAwait(false);
+            return Result.Success(enqueue.Run);
+        }
+        catch (TaskScopeNotAcceptingWorkException)
+        {
+            return Result.Failure<TaskRunDetails>(TaskRuntimeApplicationErrors.ScopeClosed);
+        }
     }
 
     private static bool IsValidJson(string payloadJson)

@@ -33,6 +33,7 @@ internal sealed class RetryTaskRunCommandHandler(
             TaskRunMutationOutcome.NotFound => Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunNotFound),
             TaskRunMutationOutcome.Conflict => Result.Failure<Unit>(TaskRuntimeApplicationErrors.ConcurrentMutation),
             TaskRunMutationOutcome.InvalidRequest => Result.Failure<Unit>(TaskRuntimeApplicationErrors.InvalidRunRequest),
+            TaskRunMutationOutcome.ScopeClosed => Result.Failure<Unit>(TaskRuntimeApplicationErrors.ScopeClosed),
             _ => Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunCannotBeRetried)
         };
     }

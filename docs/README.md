@@ -1,6 +1,7 @@
 # TaskRuntime Module
 
 Current engineering work is tracked in [TaskRuntime Production Hardening Task](task-runtime-production-hardening-task.md).
+Scope teardown work is tracked in [TaskRuntime Scope Lifecycle Task](task-runtime-scope-lifecycle-task.md).
 
 The `TaskRuntime` module is an optional persisted runtime for queued tasks, long-running task handlers, progress reporting, retries, cancellation, and operator control. It is reusable infrastructure, not an example module and not a scheduler framework by itself.
 
@@ -117,6 +118,9 @@ Tables:
 
 - `task_runs`
 - `task_control_messages`
+- `task_scope_states`
+- `task_scope_destroy_operations`
+- `task_scope_destroy_receipts`
 
 Provider-specific migrations exist for SQL Server and PostgreSQL. Tests and deployment automation apply migrations explicitly; default hosts do not auto-migrate.
 
@@ -141,6 +145,28 @@ Terminal history cleanup is optional and disabled by default. Durable control-me
 ```
 
 Only terminal runs and terminal control messages are eligible. Each status has an independent retention window, cleanup work is bounded per status and cycle, and a run is retained while any control-message history still references it.
+
+## Scope Lifecycle
+
+`ITaskRuntimeScopeLifecycle` is the product-neutral tenant cleanup facade. Its
+first accepted destroy call closes enqueue, retry, control-message, and claim
+admission for the exact `ScopeId`. It cancels queued work, requests cooperative
+cancellation for leased work, and reports `Busy` until every run is terminal.
+Control messages and runs are then removed in bounded stages before an
+immutable payload-free receipt closes the scope.
+
+Admission takes a shared transaction-scoped key lock and lifecycle mutation
+takes its exclusive counterpart on PostgreSQL and SQL Server. Exact request
+replay remains valid after closure;
+reuse of an operation or scope with different coordinates returns a conflict.
+Ordinary retention skips closing and closed scopes so it cannot race the final
+proof sequence.
+
+Task payloads, progress, errors, and actor fields are non-authoritative
+operational copies. Products must export authoritative data through the module
+that owns its meaning, decide whether a product tenant maps to `ScopeId`, and
+invoke final cleanup outside the target scope. A scoped task cannot remove its
+own run before its worker records completion.
 
 ## Production Operations
 

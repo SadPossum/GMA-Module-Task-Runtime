@@ -66,10 +66,16 @@ namespace Gma.Modules.TaskRuntime.Persistence.PostgreSqlMigrations.Migrations
                     b.Property<Guid>("RunId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ScopeId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ScopeId", "Id");
 
                     b.HasIndex("Status", "CompletedAtUtc");
 
@@ -212,6 +218,224 @@ namespace Gma.Modules.TaskRuntime.Persistence.PostgreSqlMigrations.Migrations
                     b.HasIndex("WorkerGroup", "Status", "ScheduledAtUtc", "NextAttemptAtUtc", "LockedUntilUtc");
 
                     b.ToTable("task_runs", "tasks");
+                });
+
+            modelBuilder.Entity("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeDestroyOperation", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BatchSize")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CompletedBatchCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ConcurrencyVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProofVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RemovalProofSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<long>("RemovedRecordCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RequestSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<long>("ResultingRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ScopeId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<long>("SelectedRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("OperationId");
+
+                    b.HasIndex("ScopeId")
+                        .IsUnique();
+
+                    b.ToTable("task_scope_destroy_operations", "tasks", t =>
+                        {
+                            t.HasCheckConstraint("CK_task_scope_destroy_operations_batch", "\"BatchSize\" >= 1 AND \"BatchSize\" <= 1000");
+
+                            t.HasCheckConstraint("CK_task_scope_destroy_operations_counts", "((\"RemovedRecordCount\" = 0 AND \"CompletedBatchCount\" = 0) OR (\"RemovedRecordCount\" > 0 AND \"CompletedBatchCount\" > 0)) AND \"ProofVersion\" = 1 AND \"ConcurrencyVersion\" >= 1 AND \"UpdatedAtUtc\" >= \"StartedAtUtc\"");
+
+                            t.HasCheckConstraint("CK_task_scope_destroy_operations_revision", "\"SelectedRevision\" >= 0 AND \"ResultingRevision\" = \"SelectedRevision\" + 1");
+
+                            t.HasCheckConstraint("CK_task_scope_destroy_operations_stage", "\"Stage\" >= 1 AND \"Stage\" <= 4");
+                        });
+                });
+
+            modelBuilder.Entity("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeDestroyReceipt", b =>
+                {
+                    b.Property<Guid>("OperationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BatchSize")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CompletedBatchCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RemovalProofSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<int>("RemovalProofVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("RemovedRecordCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RequestSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<long>("ResultingRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ScopeId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<long>("SelectedRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("OperationId");
+
+                    b.HasIndex("ScopeId")
+                        .IsUnique();
+
+                    b.ToTable("task_scope_destroy_receipts", "tasks", t =>
+                        {
+                            t.HasTrigger("task_scope_destroy_receipts_append_only");
+
+                            t.HasCheckConstraint("CK_task_scope_destroy_receipts_batch", "\"BatchSize\" >= 1 AND \"BatchSize\" <= 1000");
+
+                            t.HasCheckConstraint("CK_task_scope_destroy_receipts_counts", "((\"RemovedRecordCount\" = 0 AND \"CompletedBatchCount\" = 0) OR (\"RemovedRecordCount\" > 0 AND \"CompletedBatchCount\" > 0)) AND \"RemovalProofVersion\" = 1 AND \"CompletedAtUtc\" >= \"StartedAtUtc\"");
+
+                            t.HasCheckConstraint("CK_task_scope_destroy_receipts_revision", "\"SelectedRevision\" >= 0 AND \"ResultingRevision\" = \"SelectedRevision\" + 1");
+                        });
+                });
+
+            modelBuilder.Entity("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeState", b =>
+                {
+                    b.Property<string>("ScopeId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset?>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ConcurrencyVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<long>("ResultingRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("SelectedRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ScopeId");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "ScopeId");
+
+                    b.ToTable("task_scope_states", "tasks", t =>
+                        {
+                            t.HasTrigger("task_scope_states_closed_immutable");
+
+                            t.HasCheckConstraint("CK_task_scope_states_progress", "\"ConcurrencyVersion\" >= 1 AND \"UpdatedAtUtc\" >= \"StartedAtUtc\"");
+
+                            t.HasCheckConstraint("CK_task_scope_states_revision", "\"SelectedRevision\" >= 0 AND \"ResultingRevision\" = \"SelectedRevision\" + 1");
+
+                            t.HasCheckConstraint("CK_task_scope_states_status", "(\"Status\" = 1 AND \"ClosedAtUtc\" IS NULL) OR (\"Status\" = 2 AND \"ClosedAtUtc\" IS NOT NULL AND \"ClosedAtUtc\" = \"UpdatedAtUtc\")");
+                        });
+                });
+
+            modelBuilder.Entity("Gma.Framework.Tasks.Infrastructure.TaskControlMessageState", b =>
+                {
+                    b.HasOne("Gma.Framework.Tasks.Infrastructure.TaskRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeDestroyOperation", b =>
+                {
+                    b.HasOne("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeState", null)
+                        .WithMany()
+                        .HasForeignKey("ScopeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeDestroyReceipt", b =>
+                {
+                    b.HasOne("Gma.Modules.TaskRuntime.Persistence.Entities.TaskRuntimeScopeState", null)
+                        .WithMany()
+                        .HasForeignKey("ScopeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

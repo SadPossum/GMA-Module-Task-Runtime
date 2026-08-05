@@ -58,6 +58,8 @@ internal sealed class SendTaskControlMessageCommandHandler(
                 Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.RunNotFound),
             TaskControlMessageEnqueueOutcome.Conflict =>
                 Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.ConcurrentMutation),
+            TaskControlMessageEnqueueOutcome.ScopeClosed =>
+                Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.ScopeClosed),
             _ => Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.RunCannotBeControlled)
         };
     }

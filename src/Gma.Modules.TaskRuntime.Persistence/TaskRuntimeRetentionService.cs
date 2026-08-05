@@ -132,6 +132,9 @@ internal sealed class TaskRuntimeRetentionService(
                     currentOptions.MaxBatchesPerStatusPerCycle,
                     (batchSize, token) => dbContext.TaskControlMessages
                         .Where(message =>
+                            (message.ScopeId == null ||
+                             !dbContext.TaskScopeStates.Any(state =>
+                                 state.ScopeId == message.ScopeId)) &&
                             (message.Status == TaskControlMessageStatus.Pending ||
                              message.Status == TaskControlMessageStatus.Delivered ||
                              message.Status == TaskControlMessageStatus.Failed) &&
@@ -180,6 +183,9 @@ internal sealed class TaskRuntimeRetentionService(
             currentOptions,
             (batchSize, token) => dbContext.TaskControlMessages
                 .Where(message =>
+                    (message.ScopeId == null ||
+                     !dbContext.TaskScopeStates.Any(state =>
+                         state.ScopeId == message.ScopeId)) &&
                     message.Status == status &&
                     message.CompletedAtUtc != null &&
                     message.CompletedAtUtc < cutoff)
@@ -200,6 +206,9 @@ internal sealed class TaskRuntimeRetentionService(
             currentOptions,
             (batchSize, token) => dbContext.TaskRuns
                 .Where(run =>
+                    (run.ScopeId == null ||
+                     !dbContext.TaskScopeStates.Any(state =>
+                         state.ScopeId == run.ScopeId)) &&
                     run.Status == status &&
                     run.CompletedAtUtc != null &&
                     run.CompletedAtUtc < cutoff &&

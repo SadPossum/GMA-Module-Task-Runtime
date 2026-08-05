@@ -72,3 +72,12 @@ Make the optional TaskRuntime module production-ready for durable queued work, r
 - Skeleton `5873ea7` pins the published Framework and TaskRuntime heads; its canonical build, 1,836 fast tests, migration-drift checks and focused worker, projection-rebuild and cooperative-control Docker tests pass, and its exact-head `Validate` workflow is green;
 - BunkFy Backend `13860d4` pins the published heads, exposes the standalone TaskRuntime tests in its solution, removes duplicate generic provider/runtime test infrastructure and retains its product-owned worker coverage; its zero-warning build, 1,955 fast tests, 18 migration-drift checks and adapter-through-runtime Docker test pass, and its exact-head Windows/Linux `validate` and Docker workflows are green;
 - BunkFy root `791d614` records the aligned backend and root solution graph, and its full backend/frontend `validate` workflow is green.
+
+## 2026-08-05 Ordinal Scope Storage Revalidation
+
+- Task Runtime now applies Framework's reusable ordinal scope-id convention from
+  its plain infrastructure DbContext; its task-specific active deduplication key
+  uses the same provider-aware string property helper.
+- The refactor leaves both provider models unchanged. All 27 fast tests and both
+  SQL Server/PostgreSQL migration-drift checks pass, while the existing required
+  relational lane remains the owner of case-sensitive scope parity proof.

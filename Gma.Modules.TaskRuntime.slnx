@@ -27,6 +27,7 @@
   <Folder Name="/docs/">
     <File Path="docs/README.md" />
     <File Path="docs/task-runtime-production-hardening-task.md" />
+    <File Path="docs/task-runtime-scope-lifecycle-task.md" />
   </Folder>
   <Folder Name="/eng/">
     <File Path="eng/bootstrap-source-roots.ps1" />
