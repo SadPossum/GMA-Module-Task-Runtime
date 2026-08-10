@@ -4,6 +4,7 @@ using Gma.Framework.Cqrs;
 using Gma.Framework.Tasks;
 using Gma.Framework.Results;
 using Gma.Modules.TaskRuntime.Application.Queries;
+using Gma.Modules.TaskRuntime.Contracts;
 
 internal sealed class ListTaskRunsQueryHandler(ITaskRunStore store)
     : IQueryHandler<ListTaskRunsQuery, TaskRunPage>
@@ -26,7 +27,7 @@ internal sealed class ListTaskRunsQueryHandler(ITaskRunStore store)
         }
         catch (ArgumentException)
         {
-            return Result.Failure<TaskRunPage>(TaskRuntimeApplicationErrors.InvalidRunFilter);
+            return Result.Failure<TaskRunPage>(TaskRuntimeOperationErrors.InvalidRunFilter);
         }
 
         TaskRunPage page = await store.ListAsync(filter, cancellationToken).ConfigureAwait(false);

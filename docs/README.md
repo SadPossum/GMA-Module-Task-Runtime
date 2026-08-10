@@ -2,6 +2,7 @@
 
 Current engineering work is tracked in [TaskRuntime Production Hardening Task](task-runtime-production-hardening-task.md).
 Scope teardown work is tracked in [TaskRuntime Scope Lifecycle Task](task-runtime-scope-lifecycle-task.md).
+Consumer-boundary work is tracked in [TaskRuntime Consumer Contract Boundary Task](task-runtime-consumer-contract-boundary-task.md).
 
 The `TaskRuntime` module is an optional persisted runtime for queued tasks, long-running task handlers, progress reporting, retries, cancellation, and operator control. It is reusable infrastructure, not an example module and not a scheduler framework by itself.
 
@@ -59,6 +60,22 @@ For scope-aware task payloads, compose the tenancy task bridge:
 builder.AddTenantTaskExecutionContext();
 ```
 
+## In-Process Operations
+
+Modules and product integrations consume persisted run operations through
+`Gma.Modules.TaskRuntime.Contracts`:
+
+- `ITaskRunEnqueuer` submits a run;
+- `ITaskRunReader` gets, lists, and summarizes runs; and
+- `ITaskRunController` requests cancellation or retry and sends cooperative
+  control messages.
+
+The Contracts facades return the shared DTOs from `Gma.Framework.Tasks` and
+stable `TaskRuntimeOperationErrors`. Application command/query records are
+internal implementation details. Callers remain responsible for authorization
+and for verifying that a run's module, task, and scope belong to the product
+operation they are exposing.
+
 `TaskRuntimeProfiles.Default` is selected by `Gma.Modules.TaskRuntime.AdminCli` and `Gma.Modules.TaskRuntime.AdminApi`. The profile requires the persisted run store, runtime reporter, and control channel provided by `Gma.Modules.TaskRuntime.Persistence`.
 
 ## Admin CLI
@@ -84,7 +101,7 @@ tasks runs retry --run-id <id> --yes
 /api/admin/tasks/runs
 ```
 
-The API uses the same application commands and queries as the CLI. It is intended for operator tooling, not public product workflows.
+The API and CLI use the same Contracts facades. The API is intended for operator tooling, not public product workflows.
 
 ## Permissions
 
@@ -200,6 +217,8 @@ Admin list reads return total count and deterministic bounded pages. Count and p
 ## Boundaries
 
 - Task payload contracts belong to the module that owns the task.
+- External consumers use TaskRuntime Contracts facades, not Application CQRS
+  messages or persistence ports.
 - Task handlers are registered explicitly through shared task registration helpers.
 - `TaskRuntime` persists run state and exposes operator controls; it does not know module domain internals.
 - Default API/admin hosts do not start workers or register the task admin front doors.

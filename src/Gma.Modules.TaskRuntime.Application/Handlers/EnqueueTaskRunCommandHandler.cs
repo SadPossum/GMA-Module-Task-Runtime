@@ -7,6 +7,7 @@ using Gma.Framework.Tasks;
 using Gma.Framework.Runtime.Time;
 using Gma.Framework.Results;
 using Gma.Modules.TaskRuntime.Application.Commands;
+using Gma.Modules.TaskRuntime.Contracts;
 
 internal sealed class EnqueueTaskRunCommandHandler(
     ITaskRunStore store,
@@ -20,7 +21,7 @@ internal sealed class EnqueueTaskRunCommandHandler(
     {
         if (!IsValidJson(command.PayloadJson))
         {
-            return Result.Failure<TaskRunDetails>(TaskRuntimeApplicationErrors.InvalidPayloadJson);
+            return Result.Failure<TaskRunDetails>(TaskRuntimeOperationErrors.InvalidPayloadJson);
         }
 
         DateTimeOffset nowUtc = clock.UtcNow;
@@ -51,7 +52,7 @@ internal sealed class EnqueueTaskRunCommandHandler(
         }
         catch (ArgumentException)
         {
-            return Result.Failure<TaskRunDetails>(TaskRuntimeApplicationErrors.InvalidRunRequest);
+            return Result.Failure<TaskRunDetails>(TaskRuntimeOperationErrors.InvalidRunRequest);
         }
 
         try
@@ -61,7 +62,7 @@ internal sealed class EnqueueTaskRunCommandHandler(
         }
         catch (TaskScopeNotAcceptingWorkException)
         {
-            return Result.Failure<TaskRunDetails>(TaskRuntimeApplicationErrors.ScopeClosed);
+            return Result.Failure<TaskRunDetails>(TaskRuntimeOperationErrors.ScopeClosed);
         }
     }
 

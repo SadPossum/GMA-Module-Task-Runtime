@@ -7,6 +7,7 @@ using Gma.Framework.Tasks;
 using Gma.Framework.Runtime.Time;
 using Gma.Framework.Results;
 using Gma.Modules.TaskRuntime.Application.Commands;
+using Gma.Modules.TaskRuntime.Contracts;
 
 internal sealed class SendTaskControlMessageCommandHandler(
     ITaskRunStore store,
@@ -20,12 +21,12 @@ internal sealed class SendTaskControlMessageCommandHandler(
     {
         if (command.RunId == Guid.Empty)
         {
-            return Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.InvalidRunId);
+            return Result.Failure<TaskControlMessage>(TaskRuntimeOperationErrors.InvalidRunId);
         }
 
         if (!IsValidJson(command.PayloadJson))
         {
-            return Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.InvalidPayloadJson);
+            return Result.Failure<TaskControlMessage>(TaskRuntimeOperationErrors.InvalidPayloadJson);
         }
 
         DateTimeOffset nowUtc = clock.UtcNow;
@@ -43,7 +44,7 @@ internal sealed class SendTaskControlMessageCommandHandler(
         }
         catch (ArgumentException)
         {
-            return Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.InvalidControlMessage);
+            return Result.Failure<TaskControlMessage>(TaskRuntimeOperationErrors.InvalidControlMessage);
         }
 
         TaskControlMessageEnqueueOutcome outcome = await store
@@ -55,12 +56,12 @@ internal sealed class SendTaskControlMessageCommandHandler(
             TaskControlMessageEnqueueOutcome.Enqueued or TaskControlMessageEnqueueOutcome.AlreadyExists =>
                 Result.Success(message),
             TaskControlMessageEnqueueOutcome.RunNotFound =>
-                Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.RunNotFound),
+                Result.Failure<TaskControlMessage>(TaskRuntimeOperationErrors.RunNotFound),
             TaskControlMessageEnqueueOutcome.Conflict =>
-                Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.ConcurrentMutation),
+                Result.Failure<TaskControlMessage>(TaskRuntimeOperationErrors.ConcurrentMutation),
             TaskControlMessageEnqueueOutcome.ScopeClosed =>
-                Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.ScopeClosed),
-            _ => Result.Failure<TaskControlMessage>(TaskRuntimeApplicationErrors.RunCannotBeControlled)
+                Result.Failure<TaskControlMessage>(TaskRuntimeOperationErrors.ScopeClosed),
+            _ => Result.Failure<TaskControlMessage>(TaskRuntimeOperationErrors.RunCannotBeControlled)
         };
     }
 

@@ -3,7 +3,7 @@ namespace Gma.Modules.TaskRuntime.Application.Queries;
 using Gma.Framework.Cqrs;
 using Gma.Framework.Tasks;
 
-public sealed record ListTaskRunsQuery(
+internal sealed record ListTaskRunsQuery(
     string? ModuleName,
     string? TaskName,
     string? WorkerGroup,

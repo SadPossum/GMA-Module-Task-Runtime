@@ -6,15 +6,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Gma.Framework.Administration;
 using Gma.Framework.Administration.Cli;
-using Gma.Framework.Cqrs;
 using Gma.Framework.ModuleComposition;
 using Gma.Framework.Pagination;
 using Gma.Framework.Tasks;
 using Gma.Framework.Results;
 using Gma.Modules.TaskRuntime.Admin.Contracts;
 using Gma.Modules.TaskRuntime.Application;
-using Gma.Modules.TaskRuntime.Application.Commands;
-using Gma.Modules.TaskRuntime.Application.Queries;
 using Gma.Modules.TaskRuntime.Contracts;
 using Gma.Modules.TaskRuntime.Persistence;
 
@@ -81,12 +78,12 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                 {
                     if (!TaskRunStatusNames.TryParseOptional(parseResult.GetValue(statusOption), out TaskRunStatus? status))
                     {
-                        return Result.Failure<TaskRunPage>(TaskRuntimeApplicationErrors.InvalidStatus);
+                        return Result.Failure<TaskRunPage>(TaskRuntimeAdminInputErrors.InvalidStatus);
                     }
 
-                    IRequestDispatcher dispatcher = provider.GetRequiredService<IRequestDispatcher>();
-                    Result<TaskRunPage> result = await dispatcher.QueryAsync(
-                        new ListTaskRunsQuery(
+                    ITaskRunReader reader = provider.GetRequiredService<ITaskRunReader>();
+                    Result<TaskRunPage> result = await reader.ListAsync(
+                        new TaskRunListRequest(
                             parseResult.GetValue(moduleOption),
                             parseResult.GetValue(taskOption),
                             parseResult.GetValue(workerGroupOption),
@@ -136,9 +133,9 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                 requireTenant: false,
                 async (provider, token) =>
                 {
-                    IRequestDispatcher dispatcher = provider.GetRequiredService<IRequestDispatcher>();
-                    Result<TaskRunStats> result = await dispatcher.QueryAsync(
-                        new GetTaskRunStatsQuery(
+                    ITaskRunReader reader = provider.GetRequiredService<ITaskRunReader>();
+                    Result<TaskRunStats> result = await reader.GetStatsAsync(
+                        new TaskRunStatsRequest(
                             parseResult.GetValue(moduleOption),
                             parseResult.GetValue(taskOption),
                             parseResult.GetValue(workerGroupOption),
@@ -177,10 +174,11 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                 requireTenant: false,
                 async (provider, token) =>
                 {
-                    IRequestDispatcher dispatcher = provider.GetRequiredService<IRequestDispatcher>();
-                    Result<TaskRunDetails> result = await dispatcher.QueryAsync(
-                        new GetTaskRunQuery(parseResult.GetRequiredValue(runIdOption)),
-                        token).ConfigureAwait(false);
+                    ITaskRunReader reader = provider.GetRequiredService<ITaskRunReader>();
+                    Result<TaskRunDetails> result = await reader.GetAsync(
+                            parseResult.GetRequiredValue(runIdOption),
+                            token)
+                        .ConfigureAwait(false);
 
                     if (result.IsSuccess)
                     {
@@ -241,10 +239,10 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                         return Result.Failure<TaskControlMessage>(payload.Error);
                     }
 
-                    IRequestDispatcher dispatcher = provider.GetRequiredService<IRequestDispatcher>();
+                    ITaskRunController controller = provider.GetRequiredService<ITaskRunController>();
                     IAdminActorContext actorContext = provider.GetRequiredService<IAdminActorContext>();
-                    Result<TaskControlMessage> result = await dispatcher.SendAsync(
-                        new SendTaskControlMessageCommand(
+                    Result<TaskControlMessage> result = await controller.SendControlMessageAsync(
+                        new TaskRunControlRequest(
                             parseResult.GetRequiredValue(runIdOption),
                             parseResult.GetRequiredValue(commandNameOption),
                             payload.Value,
@@ -317,11 +315,10 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                         return Result.Failure<TaskRunDetails>(payload.Error);
                     }
 
-                    IRequestDispatcher dispatcher = provider.GetRequiredService<IRequestDispatcher>();
+                    ITaskRunEnqueuer enqueuer = provider.GetRequiredService<ITaskRunEnqueuer>();
                     IAdminActorContext actorContext = provider.GetRequiredService<IAdminActorContext>();
-                    Result<TaskRunDetails> result = await dispatcher.SendAsync(
-                        new EnqueueTaskRunCommand(
-                            RunId: null,
+                    Result<TaskRunDetails> result = await enqueuer.EnqueueAsync(
+                        new TaskRunEnqueueRequest(
                             parseResult.GetRequiredValue(moduleOption),
                             parseResult.GetRequiredValue(taskOption),
                             payload.Value,
@@ -332,7 +329,8 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                             actorContext.Actor?.Id,
                             parseResult.GetValue(maxAttemptsOption),
                             parseResult.GetValue(payloadVersionOption),
-                            parseResult.GetValue(deduplicationKeyOption)),
+                            parseResult.GetValue(deduplicationKeyOption),
+                            RunId: null),
                         token).ConfigureAwait(false);
 
                     if (result.IsSuccess)
@@ -371,14 +369,16 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                 {
                     if (!parseResult.GetValue(yesOption))
                     {
-                        return Result.Failure<Unit>(AdminErrors.ConfirmationRequired);
+                        return Result.Failure(AdminErrors.ConfirmationRequired);
                     }
 
-                    IRequestDispatcher dispatcher = provider.GetRequiredService<IRequestDispatcher>();
+                    ITaskRunController controller = provider.GetRequiredService<ITaskRunController>();
                     IAdminActorContext actorContext = provider.GetRequiredService<IAdminActorContext>();
-                    Result<Unit> result = await dispatcher.SendAsync(
-                        new CancelTaskRunCommand(parseResult.GetRequiredValue(runIdOption), actorContext.Actor?.Id),
-                        token).ConfigureAwait(false);
+                    Result result = await controller.CancelAsync(
+                            parseResult.GetRequiredValue(runIdOption),
+                            actorContext.Actor?.Id,
+                            token)
+                        .ConfigureAwait(false);
 
                     if (result.IsSuccess)
                     {
@@ -418,17 +418,17 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
                 {
                     if (!parseResult.GetValue(yesOption))
                     {
-                        return Result.Failure<Unit>(AdminErrors.ConfirmationRequired);
+                        return Result.Failure(AdminErrors.ConfirmationRequired);
                     }
 
-                    IRequestDispatcher dispatcher = provider.GetRequiredService<IRequestDispatcher>();
+                    ITaskRunController controller = provider.GetRequiredService<ITaskRunController>();
                     IAdminActorContext actorContext = provider.GetRequiredService<IAdminActorContext>();
-                    Result<Unit> result = await dispatcher.SendAsync(
-                        new RetryTaskRunCommand(
+                    Result result = await controller.RetryAsync(
                             parseResult.GetRequiredValue(runIdOption),
                             actorContext.Actor?.Id,
-                            parseResult.GetValue(scheduledAtOption)),
-                        token).ConfigureAwait(false);
+                            parseResult.GetValue(scheduledAtOption),
+                            token)
+                        .ConfigureAwait(false);
 
                     if (result.IsSuccess)
                     {
@@ -506,7 +506,7 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
     {
         if (!string.IsNullOrWhiteSpace(payloadJson) && payloadFile is not null)
         {
-            return Result.Failure<string>(TaskRuntimeApplicationErrors.PayloadSourceConflict);
+            return Result.Failure<string>(TaskRuntimeAdminInputErrors.PayloadSourceConflict);
         }
 
         if (!string.IsNullOrWhiteSpace(payloadJson))
@@ -517,13 +517,13 @@ public sealed class TaskRuntimeAdminCliModule : IAdminCliModule
         if (payloadFile is null)
         {
             return defaultPayloadJson is null
-                ? Result.Failure<string>(TaskRuntimeApplicationErrors.PayloadRequired)
+                ? Result.Failure<string>(TaskRuntimeAdminInputErrors.PayloadRequired)
                 : Result.Success(defaultPayloadJson);
         }
 
         if (!payloadFile.Exists)
         {
-            return Result.Failure<string>(TaskRuntimeApplicationErrors.PayloadFileNotFound);
+            return Result.Failure<string>(TaskRuntimeAdminInputErrors.PayloadFileNotFound);
         }
 
         string payload = await File.ReadAllTextAsync(payloadFile.FullName, cancellationToken).ConfigureAwait(false);

@@ -3,7 +3,7 @@ namespace Gma.Modules.TaskRuntime.Application.Commands;
 using Gma.Framework.Cqrs;
 using Gma.Framework.Tasks;
 
-public sealed record EnqueueTaskRunCommand(
+internal sealed record EnqueueTaskRunCommand(
     Guid? RunId,
     string ModuleName,
     string TaskName,

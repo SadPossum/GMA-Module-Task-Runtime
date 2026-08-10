@@ -5,6 +5,7 @@ using Gma.Framework.Tasks;
 using Gma.Framework.Runtime.Time;
 using Gma.Framework.Results;
 using Gma.Modules.TaskRuntime.Application.Commands;
+using Gma.Modules.TaskRuntime.Contracts;
 
 internal sealed class CancelTaskRunCommandHandler(
     ITaskRunStore store,
@@ -17,7 +18,7 @@ internal sealed class CancelTaskRunCommandHandler(
     {
         if (command.RunId == Guid.Empty)
         {
-            return Result.Failure<Unit>(TaskRuntimeApplicationErrors.InvalidRunId);
+            return Result.Failure<Unit>(TaskRuntimeOperationErrors.InvalidRunId);
         }
 
         TaskRunMutationOutcome outcome = await store.RequestCancellationAsync(
@@ -30,10 +31,10 @@ internal sealed class CancelTaskRunCommandHandler(
         return outcome switch
         {
             TaskRunMutationOutcome.Applied or TaskRunMutationOutcome.AlreadyApplied => Result.Success(Unit.Value),
-            TaskRunMutationOutcome.NotFound => Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunNotFound),
-            TaskRunMutationOutcome.Conflict => Result.Failure<Unit>(TaskRuntimeApplicationErrors.ConcurrentMutation),
-            TaskRunMutationOutcome.InvalidRequest => Result.Failure<Unit>(TaskRuntimeApplicationErrors.InvalidRunRequest),
-            _ => Result.Failure<Unit>(TaskRuntimeApplicationErrors.RunCannotBeCanceled)
+            TaskRunMutationOutcome.NotFound => Result.Failure<Unit>(TaskRuntimeOperationErrors.RunNotFound),
+            TaskRunMutationOutcome.Conflict => Result.Failure<Unit>(TaskRuntimeOperationErrors.ConcurrentMutation),
+            TaskRunMutationOutcome.InvalidRequest => Result.Failure<Unit>(TaskRuntimeOperationErrors.InvalidRunRequest),
+            _ => Result.Failure<Unit>(TaskRuntimeOperationErrors.RunCannotBeCanceled)
         };
     }
 }

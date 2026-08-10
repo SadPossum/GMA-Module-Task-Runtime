@@ -4,6 +4,7 @@ using Gma.Framework.Cqrs;
 using Gma.Framework.Tasks;
 using Gma.Framework.Results;
 using Gma.Modules.TaskRuntime.Application.Queries;
+using Gma.Modules.TaskRuntime.Contracts;
 
 internal sealed class GetTaskRunQueryHandler(ITaskRunStore store)
     : IQueryHandler<GetTaskRunQuery, TaskRunDetails>
@@ -14,12 +15,12 @@ internal sealed class GetTaskRunQueryHandler(ITaskRunStore store)
     {
         if (query.RunId == Guid.Empty)
         {
-            return Result.Failure<TaskRunDetails>(TaskRuntimeApplicationErrors.InvalidRunId);
+            return Result.Failure<TaskRunDetails>(TaskRuntimeOperationErrors.InvalidRunId);
         }
 
         TaskRunDetails? run = await store.GetAsync(query.RunId, cancellationToken).ConfigureAwait(false);
         return run is null
-            ? Result.Failure<TaskRunDetails>(TaskRuntimeApplicationErrors.RunNotFound)
+            ? Result.Failure<TaskRunDetails>(TaskRuntimeOperationErrors.RunNotFound)
             : Result.Success(run);
     }
 }

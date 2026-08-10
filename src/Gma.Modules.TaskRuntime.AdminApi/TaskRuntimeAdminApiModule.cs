@@ -9,15 +9,12 @@ using Gma.Framework.Administration;
 using Gma.Framework.Administration.Api;
 using Gma.Framework.Api.Observability;
 using Gma.Framework.Api.Results;
-using Gma.Framework.Cqrs;
 using Gma.Framework.ModuleComposition;
 using Gma.Framework.Pagination;
 using Gma.Framework.Tasks;
 using Gma.Framework.Results;
 using Gma.Modules.TaskRuntime.Admin.Contracts;
 using Gma.Modules.TaskRuntime.Application;
-using Gma.Modules.TaskRuntime.Application.Commands;
-using Gma.Modules.TaskRuntime.Application.Queries;
 using Gma.Modules.TaskRuntime.Contracts;
 using Gma.Modules.TaskRuntime.Persistence;
 
@@ -49,7 +46,7 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
             int? pageSize,
             HttpContext httpContext,
             AdminApiExecutor executor,
-            IRequestDispatcher dispatcher,
+            ITaskRunReader reader,
             CancellationToken cancellationToken) =>
             await executor.ExecuteAsync(
                 httpContext,
@@ -58,9 +55,9 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
                 token =>
                 {
                     return !TaskRunStatusNames.TryParseOptional(status, out TaskRunStatus? parsedStatus)
-                        ? Task.FromResult(Result.Failure<TaskRunPage>(TaskRuntimeApplicationErrors.InvalidStatus))
-                        : dispatcher.QueryAsync(
-                            new ListTaskRunsQuery(
+                        ? Task.FromResult(Result.Failure<TaskRunPage>(TaskRuntimeAdminInputErrors.InvalidStatus))
+                        : reader.ListAsync(
+                            new TaskRunListRequest(
                                 module,
                                 task,
                                 workerGroup,
@@ -81,14 +78,14 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
             string? tenant,
             HttpContext httpContext,
             AdminApiExecutor executor,
-            IRequestDispatcher dispatcher,
+            ITaskRunReader reader,
             CancellationToken cancellationToken) =>
             await executor.ExecuteAsync(
                 httpContext,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsStats, TaskRuntimeAdminPermissions.RunsRead),
                 requireTenant: false,
-                token => dispatcher.QueryAsync(
-                    new GetTaskRunStatsQuery(module, task, workerGroup, tenant),
+                token => reader.GetStatsAsync(
+                    new TaskRunStatsRequest(module, task, workerGroup, tenant),
                     token),
                 cancellationToken,
                 tenantId: tenant,
@@ -98,13 +95,13 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
             Guid runId,
             HttpContext httpContext,
             AdminApiExecutor executor,
-            IRequestDispatcher dispatcher,
+            ITaskRunReader reader,
             CancellationToken cancellationToken) =>
             await executor.ExecuteAsync(
                 httpContext,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsGet, TaskRuntimeAdminPermissions.RunsRead),
                 requireTenant: false,
-                token => dispatcher.QueryAsync(new GetTaskRunQuery(runId), token),
+                token => reader.GetAsync(runId, token),
                 cancellationToken,
                 errorStatusCodes: AdminErrorStatusCodes).ConfigureAwait(false));
 
@@ -112,15 +109,14 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
             EnqueueTaskRunRequest request,
             HttpContext httpContext,
             AdminApiExecutor executor,
-            IRequestDispatcher dispatcher,
+            ITaskRunEnqueuer enqueuer,
             CancellationToken cancellationToken) =>
             await executor.ExecuteAsync(
                 httpContext,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsEnqueue, TaskRuntimeAdminPermissions.RunsCreate),
                 requireTenant: false,
-                token => dispatcher.SendAsync(
-                    new EnqueueTaskRunCommand(
-                        request.RunId,
+                token => enqueuer.EnqueueAsync(
+                    new TaskRunEnqueueRequest(
                         request.Module,
                         request.Task,
                         request.PayloadJson,
@@ -131,7 +127,8 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
                         ResolveActorId(httpContext),
                         request.MaxAttempts ?? 1,
                         request.PayloadVersion ?? 1,
-                        request.DeduplicationKey),
+                        request.DeduplicationKey,
+                        request.RunId),
                     token),
                 cancellationToken,
                 tenantId: request.ScopeId,
@@ -142,15 +139,15 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
             ControlTaskRunRequest request,
             HttpContext httpContext,
             AdminApiExecutor executor,
-            IRequestDispatcher dispatcher,
+            ITaskRunController controller,
             CancellationToken cancellationToken) =>
             await executor.ExecuteAsync(
                 httpContext,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsControl, TaskRuntimeAdminPermissions.RunsControl),
                 requireTenant: false,
                 token => request.Confirmed
-                    ? dispatcher.SendAsync(
-                        new SendTaskControlMessageCommand(
+                    ? controller.SendControlMessageAsync(
+                        new TaskRunControlRequest(
                             runId,
                             request.Command,
                             request.PayloadJson ?? "{}",
@@ -166,15 +163,15 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
             ConfirmedRequest request,
             HttpContext httpContext,
             AdminApiExecutor executor,
-            IRequestDispatcher dispatcher,
+            ITaskRunController controller,
             CancellationToken cancellationToken) =>
             await executor.ExecuteAsync(
                 httpContext,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsCancel, TaskRuntimeAdminPermissions.RunsCancel),
                 requireTenant: false,
                 token => request.Confirmed
-                    ? dispatcher.SendAsync(new CancelTaskRunCommand(runId, ResolveActorId(httpContext)), token)
-                    : Task.FromResult(Result.Failure<Unit>(AdminErrors.ConfirmationRequired)),
+                    ? controller.CancelAsync(runId, ResolveActorId(httpContext), token)
+                    : Task.FromResult(Result.Failure(AdminErrors.ConfirmationRequired)),
                 cancellationToken,
                 errorStatusCodes: AdminErrorStatusCodes).ConfigureAwait(false));
 
@@ -183,15 +180,15 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
             RetryTaskRunRequest request,
             HttpContext httpContext,
             AdminApiExecutor executor,
-            IRequestDispatcher dispatcher,
+            ITaskRunController controller,
             CancellationToken cancellationToken) =>
             await executor.ExecuteAsync(
                 httpContext,
                 AdminOperation.Create(TaskRuntimeAdminOperationNames.RunsRetry, TaskRuntimeAdminPermissions.RunsRetry),
                 requireTenant: false,
                 token => request.Confirmed
-                    ? dispatcher.SendAsync(new RetryTaskRunCommand(runId, ResolveActorId(httpContext), request.ScheduledAtUtc), token)
-                    : Task.FromResult(Result.Failure<Unit>(AdminErrors.ConfirmationRequired)),
+                    ? controller.RetryAsync(runId, ResolveActorId(httpContext), request.ScheduledAtUtc, token)
+                    : Task.FromResult(Result.Failure(AdminErrors.ConfirmationRequired)),
                 cancellationToken,
                 errorStatusCodes: AdminErrorStatusCodes).ConfigureAwait(false));
     }
@@ -223,18 +220,18 @@ public sealed class TaskRuntimeAdminApiModule : IAdminApiModule
         httpContext.RequestServices.GetService<IAdminActorContext>()?.Actor?.Id;
 
     private static readonly ApiErrorStatusCodeMap AdminErrorStatusCodes = ApiErrorStatusCodeMap.Create(
-        new(TaskRuntimeApplicationErrors.RunNotFound.Code, StatusCodes.Status404NotFound),
-        new(TaskRuntimeApplicationErrors.InvalidPayloadJson.Code, StatusCodes.Status400BadRequest),
-        new(TaskRuntimeApplicationErrors.InvalidRunId.Code, StatusCodes.Status400BadRequest),
-        new(TaskRuntimeApplicationErrors.InvalidStatus.Code, StatusCodes.Status400BadRequest),
-        new(TaskRuntimeApplicationErrors.PayloadRequired.Code, StatusCodes.Status400BadRequest),
-        new(TaskRuntimeApplicationErrors.PayloadSourceConflict.Code, StatusCodes.Status400BadRequest),
-        new(TaskRuntimeApplicationErrors.PayloadFileNotFound.Code, StatusCodes.Status400BadRequest),
-        new(TaskRuntimeApplicationErrors.RunCannotBeCanceled.Code, StatusCodes.Status409Conflict),
-        new(TaskRuntimeApplicationErrors.RunCannotBeRetried.Code, StatusCodes.Status409Conflict),
-        new(TaskRuntimeApplicationErrors.RunCannotBeControlled.Code, StatusCodes.Status409Conflict),
-        new(TaskRuntimeApplicationErrors.InvalidControlMessage.Code, StatusCodes.Status400BadRequest),
-        new(TaskRuntimeApplicationErrors.InvalidRunRequest.Code, StatusCodes.Status400BadRequest),
-        new(TaskRuntimeApplicationErrors.InvalidRunFilter.Code, StatusCodes.Status400BadRequest),
-        new(TaskRuntimeApplicationErrors.ConcurrentMutation.Code, StatusCodes.Status409Conflict));
+        new(TaskRuntimeOperationErrors.RunNotFound.Code, StatusCodes.Status404NotFound),
+        new(TaskRuntimeOperationErrors.InvalidPayloadJson.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeOperationErrors.InvalidRunId.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeAdminInputErrors.InvalidStatus.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeAdminInputErrors.PayloadRequired.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeAdminInputErrors.PayloadSourceConflict.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeAdminInputErrors.PayloadFileNotFound.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeOperationErrors.RunCannotBeCanceled.Code, StatusCodes.Status409Conflict),
+        new(TaskRuntimeOperationErrors.RunCannotBeRetried.Code, StatusCodes.Status409Conflict),
+        new(TaskRuntimeOperationErrors.RunCannotBeControlled.Code, StatusCodes.Status409Conflict),
+        new(TaskRuntimeOperationErrors.InvalidControlMessage.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeOperationErrors.InvalidRunRequest.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeOperationErrors.InvalidRunFilter.Code, StatusCodes.Status400BadRequest),
+        new(TaskRuntimeOperationErrors.ConcurrentMutation.Code, StatusCodes.Status409Conflict));
 }

@@ -9,6 +9,7 @@ using Gma.Modules.TaskRuntime.Application;
 using Gma.Modules.TaskRuntime.Application.Commands;
 using Gma.Modules.TaskRuntime.Application.Handlers;
 using Gma.Modules.TaskRuntime.Application.Queries;
+using Gma.Modules.TaskRuntime.Contracts;
 using Xunit;
 
 [Trait("Category", "Unit")]
@@ -47,7 +48,7 @@ public sealed class TaskRuntimeApplicationHandlerTests
         Result<TaskRunDetails> result = await handler.HandleAsync(command, CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(TaskRuntimeApplicationErrors.InvalidRunRequest, result.Error);
+        Assert.Equal(TaskRuntimeOperationErrors.InvalidRunRequest, result.Error);
         Assert.Null(store.LastEnqueueRequest);
     }
 
@@ -65,7 +66,7 @@ public sealed class TaskRuntimeApplicationHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(TaskRuntimeApplicationErrors.ScopeClosed, result.Error);
+        Assert.Equal(TaskRuntimeOperationErrors.ScopeClosed, result.Error);
     }
 
     [Theory]
@@ -163,7 +164,7 @@ public sealed class TaskRuntimeApplicationHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(TaskRuntimeApplicationErrors.InvalidRunFilter, result.Error);
+        Assert.Equal(TaskRuntimeOperationErrors.InvalidRunFilter, result.Error);
     }
 
     [Fact]
@@ -177,7 +178,7 @@ public sealed class TaskRuntimeApplicationHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(TaskRuntimeApplicationErrors.InvalidRunFilter, result.Error);
+        Assert.Equal(TaskRuntimeOperationErrors.InvalidRunFilter, result.Error);
     }
 
     private static EnqueueTaskRunCommand CreateEnqueueCommand(Guid runId) =>
