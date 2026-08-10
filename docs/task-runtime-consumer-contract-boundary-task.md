@@ -1,6 +1,6 @@
 # TaskRuntime Consumer Contract Boundary Task
 
-Status: in progress
+Status: completed
 Date: 2026-08-10
 
 ## Goal
@@ -92,19 +92,19 @@ second copy in this module.
 
 ## Delivery
 
-- [ ] Add split Contracts facades, request records, operation errors, and
+- [x] Add split Contracts facades, request records, operation errors, and
   contract/registration tests.
-- [ ] Implement the Application facade over the current command/query handlers
+- [x] Implement the Application facade over the current command/query handlers
   and make CQRS messages internal.
-- [ ] Move TaskRuntime AdminApi/AdminCli to the Contracts facade and keep admin
+- [x] Move TaskRuntime AdminApi/AdminCli to the Contracts facade and keep admin
   parsing errors in Admin.Contracts.
-- [ ] Move the canonical GMA Skeleton integration consumer to Contracts and add
+- [x] Move the canonical GMA Skeleton integration consumer to Contracts and add
   a focused boundary guard where useful.
-- [ ] Move BunkFy Ingestion and Retention consumers to Contracts and add the
+- [x] Move BunkFy Ingestion and Retention consumers to Contracts and add the
   reusable-module boundary guard.
-- [ ] Update TaskRuntime, Skeleton, and BunkFy documentation/pins after focused
+- [x] Update TaskRuntime, Skeleton, and BunkFy documentation/pins after focused
   verification.
-- [ ] Run one consolidated non-Docker gate per changed repository at the
+- [x] Run one consolidated non-Docker gate per changed repository at the
   completed slice boundary, publish exact pins, and verify exact CI.
 
 ## Verification Plan
@@ -123,7 +123,30 @@ second copy in this module.
 
 ## Verification Evidence
 
-Pending implementation and slice-boundary verification.
+- TaskRuntime functional commit
+  `088b7b65e4a7305873d104bef7dde3843be34ce4` passed solution sync,
+  boundary checks, a zero-warning solution build, PostgreSQL and SQL Server
+  migration-drift checks, 50 non-Docker tests, and package audit locally.
+- TaskRuntime exact-commit CI passed `validate` run `31365647255` on Ubuntu and
+  Windows, including the relational integration job, and `Security Baseline`
+  run `31365647218`.
+- GMA Skeleton commit `9622a6c12708ec77a8383ba44d482b6db99fbfcb`
+  passed its complete non-Docker verification locally. Exact-commit CI passed
+  `Validate` run `31367024206`, `Security Baseline` run `31367024174`, and
+  `CodeQL` run `31367024195`.
+- BunkFy backend commit `2faffcb5831f2b5ea5198e2fd070eb7a5371f167`
+  passed its complete 295-project non-Docker verification locally, including a
+  zero-warning build, migration drift, architecture, Ingestion, Retention, and
+  host integration tests. Exact-commit CI passed `validate` run `31367024210`
+  on Ubuntu and Windows and `Security Baseline` run `31367024211`.
+- BunkFy root commit `9e92e8930a1288bd2e314481952c8ccad7b00712`
+  passed the lightweight composition, pointer, release-policy, and operational
+  evidence gate locally. Exact-commit CI passed `validate` run `31367200880`,
+  `Security Baseline` run `31367201018`, and `CodeQL` run `31367200899` for C#
+  and JavaScript/TypeScript.
+- No local Docker/provider gate was run because the slice changed no persistence
+  model, migration, provider mapping, transaction, or query behavior. The
+  TaskRuntime relational CI job supplies the provider-backed proof.
 
 ## Not In This Slice
 
