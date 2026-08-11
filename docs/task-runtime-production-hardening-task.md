@@ -81,3 +81,10 @@ Make the optional TaskRuntime module production-ready for durable queued work, r
 - The refactor leaves both provider models unchanged. All 27 fast tests and both
   SQL Server/PostgreSQL migration-drift checks pass, while the existing required
   relational lane remains the owner of case-sensitive scope parity proof.
+
+## 2026-08-11 Lifecycle Observability Revalidation
+
+- Retention now reports deleted records, failures, cycle duration, and oldest eligible terminal age through Framework-owned task instrument names. Tags are limited to record kind and finite status values.
+- Cleanup records each completed batch before a later batch can fail, so operators retain truthful partial-progress evidence. Metrics failures cannot stop retention work.
+- Oldest-terminal queries follow the same eligibility rules as deletion, including active scope holds and control-linked runs.
+- All 51 fast tests and all four required PostgreSQL/SQL Server relational tests pass. Skeleton provider conformance and BunkFy's complete non-Docker verification also pass against implementation `b8856c5`.
