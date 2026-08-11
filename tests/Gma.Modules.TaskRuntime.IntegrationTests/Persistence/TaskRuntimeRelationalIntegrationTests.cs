@@ -1,5 +1,6 @@
 namespace Gma.Modules.TaskRuntime.IntegrationTests;
 
+using Gma.Framework.Runtime;
 using Gma.Framework.Runtime.Time;
 using Gma.Framework.Tasks;
 using Gma.Modules.TaskRuntime.IntegrationTests.Support;
@@ -556,7 +557,10 @@ public sealed partial class TaskRuntimeRelationalIntegrationTests
         MutableClock clock)
     {
         ServiceCollection services = new();
+        services.AddMetrics();
+        services.AddOptions<ApplicationIdentityOptions>();
         services.AddSingleton<ISystemClock>(clock);
+        services.AddSingleton<TaskRuntimeRetentionMetrics>();
         services.AddDbContext<TaskRuntimeDbContext>(options => ConfigureProvider(options, provider, connectionString));
         await using ServiceProvider serviceProvider = services.BuildServiceProvider(validateScopes: true);
         TaskRuntimeRetentionOptions retentionOptions = new()
@@ -574,6 +578,7 @@ public sealed partial class TaskRuntimeRelationalIntegrationTests
         TaskRuntimeRetentionService retention = new(
             serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             Options.Create(retentionOptions),
+            serviceProvider.GetRequiredService<TaskRuntimeRetentionMetrics>(),
             NullLogger<TaskRuntimeRetentionService>.Instance);
 
         await retention.CleanupOnceAsync(retentionOptions, CancellationToken.None);

@@ -35,6 +35,7 @@ public static class DependencyInjection
                 TaskRuntimeRetentionOptionsValidator>());
         builder.Services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IHostedService, TaskRuntimeRetentionService>());
+        builder.Services.TryAddSingleton<TaskRuntimeRetentionMetrics>();
 
         builder.Services.TryAddScoped<ITaskRunStore, TaskRuntimeRunStore>();
         builder.Services.TryAddScoped<ITaskRuntimeReporter>(provider => provider.GetRequiredService<ITaskRunStore>());

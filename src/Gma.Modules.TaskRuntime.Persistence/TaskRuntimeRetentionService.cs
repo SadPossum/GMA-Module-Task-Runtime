@@ -1,5 +1,6 @@
 namespace Gma.Modules.TaskRuntime.Persistence;
 
+using System.Diagnostics;
 using Gma.Framework.Runtime.Maintenance;
 using Gma.Framework.Runtime.Time;
 using Gma.Framework.Tasks;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Options;
 internal sealed class TaskRuntimeRetentionService(
     IServiceScopeFactory scopeFactory,
     IOptions<TaskRuntimeRetentionOptions> options,
+    TaskRuntimeRetentionMetrics metrics,
     ILogger<TaskRuntimeRetentionService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -176,67 +178,83 @@ internal sealed class TaskRuntimeRetentionService(
         TaskControlMessageStatus status,
         DateTimeOffset cutoff,
         TaskRuntimeRetentionOptions currentOptions,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken)
+    {
+        IQueryable<TaskControlMessageState> terminal = dbContext.TaskControlMessages
+            .Where(message =>
+                (message.ScopeId == null ||
+                 !dbContext.TaskScopeStates.Any(state => state.ScopeId == message.ScopeId)) &&
+                message.Status == status &&
+                message.CompletedAtUtc != null);
+
         await this.CleanupBatchesAsync(
-            "control message",
+            "control-message",
             status.ToString(),
             currentOptions,
-            (batchSize, token) => dbContext.TaskControlMessages
-                .Where(message =>
-                    (message.ScopeId == null ||
-                     !dbContext.TaskScopeStates.Any(state =>
-                         state.ScopeId == message.ScopeId)) &&
-                    message.Status == status &&
-                    message.CompletedAtUtc != null &&
-                    message.CompletedAtUtc < cutoff)
+            (batchSize, token) => terminal
+                .Where(message => message.CompletedAtUtc < cutoff)
                 .OrderBy(message => message.CompletedAtUtc)
                 .Take(batchSize)
                 .ExecuteDeleteAsync(token),
+            token => terminal.MinAsync(message => message.CompletedAtUtc, token),
             cancellationToken).ConfigureAwait(false);
+    }
 
     private async Task CleanupRunStatusAsync(
         TaskRuntimeDbContext dbContext,
         TaskRunStatus status,
         DateTimeOffset cutoff,
         TaskRuntimeRetentionOptions currentOptions,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken)
+    {
+        IQueryable<TaskRun> terminal = dbContext.TaskRuns
+            .Where(run =>
+                (run.ScopeId == null ||
+                 !dbContext.TaskScopeStates.Any(state => state.ScopeId == run.ScopeId)) &&
+                run.Status == status &&
+                run.CompletedAtUtc != null &&
+                !dbContext.TaskControlMessages.Any(message => message.RunId == run.Id));
+
         await this.CleanupBatchesAsync(
             "run",
             status.ToString(),
             currentOptions,
-            (batchSize, token) => dbContext.TaskRuns
-                .Where(run =>
-                    (run.ScopeId == null ||
-                     !dbContext.TaskScopeStates.Any(state =>
-                         state.ScopeId == run.ScopeId)) &&
-                    run.Status == status &&
-                    run.CompletedAtUtc != null &&
-                    run.CompletedAtUtc < cutoff &&
-                    !dbContext.TaskControlMessages.Any(message => message.RunId == run.Id))
+            (batchSize, token) => terminal
+                .Where(run => run.CompletedAtUtc < cutoff)
                 .OrderBy(run => run.CompletedAtUtc)
                 .Take(batchSize)
                 .ExecuteDeleteAsync(token),
+            token => terminal.MinAsync(run => run.CompletedAtUtc, token),
             cancellationToken).ConfigureAwait(false);
+    }
 
     private async Task CleanupBatchesAsync(
         string recordKind,
         string status,
         TaskRuntimeRetentionOptions currentOptions,
         Func<int, CancellationToken, Task<int>> deleteBatch,
+        Func<CancellationToken, Task<DateTimeOffset?>> getOldestTerminal,
         CancellationToken cancellationToken)
     {
         int deletedTotal = 0;
+        Stopwatch stopwatch = Stopwatch.StartNew();
         try
         {
-            deletedTotal = await BoundedBatchProcessor.ExecuteAsync(
+            await BoundedBatchProcessor.ExecuteAsync(
                     currentOptions.BatchSize,
                     currentOptions.MaxBatchesPerStatusPerCycle,
                     deleteBatch,
+                    processed => deletedTotal = checked(deletedTotal + processed),
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            DateTimeOffset? oldestTerminal = await getOldestTerminal(cancellationToken)
+                .ConfigureAwait(false);
+            this.TrySetOldestTerminal(recordKind, status, oldestTerminal);
+
             if (deletedTotal > 0)
             {
+                this.TryRecordDeleted(recordKind, status, deletedTotal);
                 logger.LogInformation(
                     "Deleted {DeletedCount} terminal task {RecordKind} records with status {Status}.",
                     deletedTotal,
@@ -250,11 +268,70 @@ internal sealed class TaskRuntimeRetentionService(
         }
         catch (Exception exception)
         {
+            this.TryRecordDeleted(recordKind, status, deletedTotal);
+            this.TryRecordFailure(recordKind, status);
+            this.TrySetOldestTerminal(recordKind, status, null);
             logger.LogError(
                 "Failed to clean terminal task {RecordKind} records with status {Status} using {ExceptionType}; other statuses will continue.",
                 recordKind,
                 status,
                 exception.GetType().Name);
+        }
+        finally
+        {
+            stopwatch.Stop();
+            this.TryRecordDuration(recordKind, status, stopwatch.Elapsed);
+        }
+    }
+
+    private void TryRecordDeleted(string recordKind, string status, int count)
+    {
+        try
+        {
+            metrics.RecordDeleted(recordKind, status, count);
+        }
+        catch (Exception)
+        {
+            // Metrics are observability only; exporter failures must not stop cleanup.
+        }
+    }
+
+    private void TryRecordFailure(string recordKind, string status)
+    {
+        try
+        {
+            metrics.RecordFailure(recordKind, status);
+        }
+        catch (Exception)
+        {
+            // Metrics are observability only; exporter failures must not stop cleanup.
+        }
+    }
+
+    private void TryRecordDuration(string recordKind, string status, TimeSpan duration)
+    {
+        try
+        {
+            metrics.RecordDuration(recordKind, status, duration);
+        }
+        catch (Exception)
+        {
+            // Metrics are observability only; exporter failures must not stop cleanup.
+        }
+    }
+
+    private void TrySetOldestTerminal(
+        string recordKind,
+        string status,
+        DateTimeOffset? completedAtUtc)
+    {
+        try
+        {
+            metrics.SetOldestTerminal(recordKind, status, completedAtUtc);
+        }
+        catch (Exception)
+        {
+            // Metrics are observability only; exporter failures must not stop cleanup.
         }
     }
 }
